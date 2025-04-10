@@ -8,6 +8,7 @@ import process from "process";
 // Import route handlers
 import { browseHandler } from "./routes/browseRoute.js";
 import { rawFileHandler } from "./routes/rawFileRoute.js";
+import { downloadHandler } from "./routes/downloadRoute.js";
 import { 
   createDirectoryHandler, 
   createFileHandler, 
@@ -34,6 +35,7 @@ app.get("/", (c) => {
 
 // Set up routes
 app.get("/raw/*", rawFileHandler(targetDirectory));
+app.get("/download/*", downloadHandler(targetDirectory));
 app.get("/browse/*", browseHandler(targetDirectory));
 
 // API routes
@@ -47,21 +49,19 @@ const stateFilePath = path.join(targetDirectory, '.local', 'file-history-state.j
 
 // Initialize file system watcher with our custom utility
 const watcher = watchDirectory(targetDirectory, stateFilePath, {
-  onNewFile: (filePath) => {
-    console.log(`[File Watcher] New file detected: ${filePath}`);
-    // ここに新しいファイルが検出されたときの処理を追加できます
+  processChangedFiles: true, // 変更ファイル処理を有効化
+  skipInitialProcessing: true, // 初回起動時のファイル処理をスキップ
+  onNewFile: (relativePath) => {
+    console.log(`[File Watcher] New file detected: ${relativePath}`);
   },
-  onModifiedFile: (filePath) => {
-    console.log(`[File Watcher] File modified: ${filePath}`);
-    // ここに変更されたファイルの処理を追加できます
+  onModifiedFile: (relativePath) => {
+    console.log(`[File Watcher] File modified: ${relativePath}`);
   },
-  onDeletedFile: (filePath) => {
-    console.log(`[File Watcher] File deleted: ${filePath}`);
-    // ここに削除されたファイルの処理を追加できます
+  onDeletedFile: (relativePath) => {
+    console.log(`[File Watcher] File deleted: ${relativePath}`);
   },
   onReady: () => {
     console.log('[File Watcher] Initial scan complete and differences detected');
-    // ここに初期スキャン完了時の処理を追加できます
   }
 });
 
@@ -77,5 +77,7 @@ serve(
     console.log(`Server is running on ${url}`);
     console.log(`Showing contents of: ${targetDirectory}`);
     console.log(`File watching active with history tracking in .local/file-history-state.json`);
+    console.log(`File processing active - text extraction and image base64 conversion enabled`);
+    console.log(`Initial file processing skipped - new and changed files will be processed when modified`);
   },
 );
