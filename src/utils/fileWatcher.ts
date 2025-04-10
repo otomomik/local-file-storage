@@ -1,32 +1,7 @@
 import chokidar from 'chokidar';
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
-import { 
-  processFile, 
-  updateProcessedFileStore, 
-  saveProcessedFileStore,
-  loadProcessedFileStore,
-  removeFileFromStore
-} from './fileProcessor.js';
-
-// ファイルのハッシュを計算する関数
-function calculateHash(filePath: string): string {
-  try {
-    const fileBuffer = fs.readFileSync(filePath);
-    const hashSum = crypto.createHash('sha256');
-    hashSum.update(fileBuffer);
-    return hashSum.digest('hex');
-  } catch (error) {
-    console.error(`Error calculating hash for ${filePath}:`, error);
-    return '';
-  }
-}
-
-// ファイル状態を格納するタイプ
-interface FileState {
-  [filePath: string]: string; // ファイルパス -> ハッシュ値
-}
+import { LanceDbManager } from './lanceDbManager.js';
 
 // 相対パスを取得する関数
 function getRelativePath(fullPath: string, targetDirectory: string): string {
@@ -36,7 +11,6 @@ function getRelativePath(fullPath: string, targetDirectory: string): string {
 // 監視の設定と開始
 export function watchDirectory(
   targetDirectory: string, 
-  stateFilePath?: string, 
   options: {
     onNewFile?: (filePath: string) => void;
     onModifiedFile?: (filePath: string) => void;
@@ -52,42 +26,40 @@ export function watchDirectory(
     try {
       fs.mkdirSync(localDir, { recursive: true });
     } catch (error) {
-      console.error('Error creating .local directory:', error);
+      // Error creating .local directory
     }
   }
 
-  // 前回の状態を保存するファイルパス
-  const stateFile = stateFilePath || path.join(targetDirectory, '.local', 'file-history-state.json');
+  // LanceDB マネージャーの初期化
+  const lanceDbManager = new LanceDbManager(targetDirectory);
+  // データベースが初期化されたかどうかのフラグ
+  let isDbInitialized = false;
+  // 初期化待ちの処理キュー
+  const pendingFileProcessingQueue: Array<{fullPath: string, relativePath: string}> = [];
   
-  // 処理済みファイルのデータを格納するファイルパス
-  const processedDataFile = path.join(targetDirectory, '.local', 'processed-file-data.json');
-  
-  // 処理済みファイルデータの読み込み
-  if (options.processChangedFiles) {
-    loadProcessedFileStore(processedDataFile);
-  }
-
-  // 以前の状態を読み込む
-  let previousState: FileState = {};
-  if (fs.existsSync(stateFile)) {
+  // 非同期初期化を開始
+  (async () => {
     try {
-      const stateData = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+      await lanceDbManager.initialize();
+      isDbInitialized = true;
       
-      // ファイルパスが相対パスでない場合は、相対パスに変換
-      for (const fullPath in stateData) {
-        const relativePath = getRelativePath(fullPath, targetDirectory);
-        previousState[relativePath] = stateData[fullPath];
+      // 初期化完了後、キューに溜まった処理を実行
+      if (pendingFileProcessingQueue.length > 0) {
+        for (const {fullPath, relativePath} of pendingFileProcessingQueue) {
+          await processFileWithLanceDb(fullPath, relativePath);
+        }
+        pendingFileProcessingQueue.length = 0; // キューをクリア
       }
+      
+      // データベース内の全レコードを取得
+      await lanceDbManager.listAllRecords();
     } catch (error) {
-      console.error('Error reading previous state file:', error);
+      // Failed to initialize LanceDB
     }
-  }
-
-  // 現在の状態を保存するオブジェクト（相対パス -> ハッシュ値）
-  const currentState: FileState = {};
+  })();
 
   // .ファイルと .ディレクトリを無視するパターン
-  const ignoredPattern = /(^|[\/\\])\.(?!local\/file-history-state\.json$).+/;
+  const ignoredPattern = /(^|[\/\\])\..+/;
 
   // 監視の設定
   const watcher = chokidar.watch(targetDirectory, {
@@ -99,105 +71,44 @@ export function watchDirectory(
       pollInterval: 100
     },
     ignored: [
-      ignoredPattern, // ドットファイルを無視（ただし状態ファイルは除く）
-      path.join(targetDirectory, '.local', 'file-history-state.json'), // 状態ファイル自体も監視対象から除外
-      path.join(targetDirectory, '.local', 'processed-file-data.json') // 処理済みファイルデータも除外
+      ignoredPattern, // ドットファイルを無視
+      path.join(targetDirectory, '.local', '**/*'), // .local ディレクトリ内は全て除外
+      path.join(targetDirectory, 'node_modules', '**/*') // node_modules も除外
     ]
   });
 
-  // ファイル処理関数 - テキスト抽出・画像はbase64化
+  // LanceDB処理を含むファイル処理関数
+  async function processFileWithLanceDb(fullPath: string, relativePath: string): Promise<void> {
+    try {
+      // LanceDBに登録
+      await lanceDbManager.upsertFile(fullPath, relativePath);
+    } catch (error) {
+      // Error in file processing
+    }
+  }
+
+  // ファイル処理関数 - LanceDB へのデータ登録
   async function handleFileProcessing(fullPath: string, relativePath: string): Promise<void> {
     if (!options.processChangedFiles) return;
     
-    try {
-      console.log(`Processing file: ${relativePath}`);
-      const processedData = await processFile(fullPath, relativePath);
-      
-      if (processedData.processed) {
-        // 処理済みデータを保存
-        updateProcessedFileStore(processedData);
-        console.log(`Successfully processed ${relativePath} as ${processedData.type}`);
-      }
-    } catch (error) {
-      console.error(`Error in file processing for ${relativePath}:`, error);
+    // データベース初期化が完了していない場合はキューに入れる
+    if (!isDbInitialized) {
+      pendingFileProcessingQueue.push({fullPath, relativePath});
+      return;
     }
-  }
-  
-  // ファイル履歴状態を保存する関数
-  function saveFileHistoryState(): void {
-    try {
-      fs.writeFileSync(stateFile, JSON.stringify(currentState, null, 2));
-      console.log(`File history state updated in .local/file-history-state.json`);
-    } catch (error) {
-      console.error('Error writing state file:', error);
-    }
+    
+    // 初期化済みならば直接処理
+    await processFileWithLanceDb(fullPath, relativePath);
   }
 
   // 準備完了イベント
   watcher.on('ready', () => {
-    console.log('Initial scan complete. Ready for changes.');
-    
-    // 初期状態を保存（相対パスで）
-    saveFileHistoryState();
-    
     // 差分を検出して表示・ファイル処理実行
-    console.log('Changes detected on startup:');
-    
-    // 新規・変更ファイルを処理するためのキュー
-    const filesToProcess: Array<{fullPath: string, relativePath: string}> = [];
-    
-    for (const relativePath in currentState) {
-      if (!previousState[relativePath]) {
-        console.log(`New file: ${relativePath}`);
-        options.onNewFile?.(relativePath);
-        if (options.processChangedFiles && !options.skipInitialProcessing) {
-          const fullPath = path.join(targetDirectory, relativePath);
-          filesToProcess.push({fullPath, relativePath});
-        }
-      } else if (previousState[relativePath] !== currentState[relativePath]) {
-        console.log(`Modified: ${relativePath}`);
-        options.onModifiedFile?.(relativePath);
-        if (options.processChangedFiles && !options.skipInitialProcessing) {
-          const fullPath = path.join(targetDirectory, relativePath);
-          filesToProcess.push({fullPath, relativePath});
-        }
-      }
-    }
-    
-    for (const relativePath in previousState) {
-      if (!currentState[relativePath]) {
-        console.log(`Deleted: ${relativePath}`);
-        options.onDeletedFile?.(relativePath);
-        // 削除されたファイルを処理済みデータから削除
-        if (options.processChangedFiles) {
-          removeFileFromStore(relativePath);
-        }
-      }
-    }
     
     // 初回起動時の処理をスキップするフラグがある場合はメッセージを表示
-    if (options.skipInitialProcessing && options.processChangedFiles && filesToProcess.length > 0) {
-      console.log(`Skipping initial processing of ${filesToProcess.length} files as requested.`);
+    if (options.skipInitialProcessing && options.processChangedFiles) {
       options.onReady?.();
       return;
-    }
-    
-    // ファイル処理を実行（順次処理）
-    if (options.processChangedFiles && filesToProcess.length > 0) {
-      console.log(`Processing ${filesToProcess.length} changed files...`);
-      
-      // 変更ファイルを順次処理
-      (async () => {
-        for (const {fullPath, relativePath} of filesToProcess) {
-          await handleFileProcessing(fullPath, relativePath);
-        }
-        
-        // 処理完了後、保存
-        saveProcessedFileStore(processedDataFile);
-        // 処理後にファイル履歴状態も更新
-        saveFileHistoryState();
-        console.log(`Completed processing ${filesToProcess.length} files`);
-      })();
     }
     
     options.onReady?.();
@@ -211,28 +122,21 @@ export function watchDirectory(
     }
     
     try {
-      const fileHash = calculateHash(fullPath);
       const relativePath = getRelativePath(fullPath, targetDirectory);
-      currentState[relativePath] = fileHash;
       
-      // ready イベント後の変更のみログ出力
+      // ready イベント後の変更のみ処理
       if (Object.keys(watcher.getWatched()).length > 0) {
-        console.log(`File ${relativePath} has been added`);
         options.onNewFile?.(relativePath);
         
         // ファイル追加時に処理を実行
         if (options.processChangedFiles) {
           (async () => {
             await handleFileProcessing(fullPath, relativePath);
-            // 処理後データ保存
-            saveProcessedFileStore(processedDataFile);
-            // ファイル履歴状態も更新
-            saveFileHistoryState();
           })();
         }
       }
     } catch (error) {
-      console.error(`Error processing added file ${fullPath}:`, error);
+      // Error processing added file
     }
   });
 
@@ -244,24 +148,17 @@ export function watchDirectory(
     }
     
     try {
-      const fileHash = calculateHash(fullPath);
       const relativePath = getRelativePath(fullPath, targetDirectory);
-      currentState[relativePath] = fileHash;
-      console.log(`File ${relativePath} has been changed`);
       options.onModifiedFile?.(relativePath);
       
       // ファイル変更時に処理を実行
       if (options.processChangedFiles) {
         (async () => {
           await handleFileProcessing(fullPath, relativePath);
-          // 処理後データ保存
-          saveProcessedFileStore(processedDataFile);
-          // ファイル履歴状態も更新
-          saveFileHistoryState();
         })();
       }
     } catch (error) {
-      console.error(`Error processing changed file ${fullPath}:`, error);
+      // Error processing changed file
     }
   });
 
@@ -273,16 +170,19 @@ export function watchDirectory(
     }
     
     const relativePath = getRelativePath(fullPath, targetDirectory);
-    delete currentState[relativePath];
-    console.log(`File ${relativePath} has been removed`);
     options.onDeletedFile?.(relativePath);
     
     // 削除されたファイルを処理済みデータから削除
     if (options.processChangedFiles) {
-      removeFileFromStore(relativePath);
-      saveProcessedFileStore(processedDataFile);
-      // ファイル履歴状態も更新
-      saveFileHistoryState();
+      (async () => {
+        // データベース初期化が完了していない場合はスキップ
+        if (!isDbInitialized) {
+          return;
+        }
+        
+        // LanceDBから削除
+        await lanceDbManager.deleteFile(relativePath);
+      })();
     }
   });
 
@@ -292,9 +192,6 @@ export function watchDirectory(
     if (path.basename(dirPath).startsWith('.') && path.basename(dirPath) !== '.local') {
       return;
     }
-    
-    const relativePath = getRelativePath(dirPath, targetDirectory);
-    console.log(`Directory ${relativePath} has been added`);
   });
 
   // ディレクトリ削除イベント
@@ -303,14 +200,11 @@ export function watchDirectory(
     if (path.basename(dirPath).startsWith('.') && path.basename(dirPath) !== '.local') {
       return;
     }
-    
-    const relativePath = getRelativePath(dirPath, targetDirectory);
-    console.log(`Directory ${relativePath} has been removed`);
   });
 
   // エラーイベント
   watcher.on('error', (error) => {
-    console.error(`Watcher error:`, error);
+    // Watcher error
   });
 
   return watcher;

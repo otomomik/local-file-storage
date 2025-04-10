@@ -8,7 +8,6 @@ import process from "process";
 // Import route handlers
 import { browseHandler } from "./routes/browseRoute.js";
 import { rawFileHandler } from "./routes/rawFileRoute.js";
-import { downloadHandler } from "./routes/downloadRoute.js";
 import { 
   createDirectoryHandler, 
   createFileHandler, 
@@ -35,7 +34,6 @@ app.get("/", (c) => {
 
 // Set up routes
 app.get("/raw/*", rawFileHandler(targetDirectory));
-app.get("/download/*", downloadHandler(targetDirectory));
 app.get("/browse/*", browseHandler(targetDirectory));
 
 // API routes
@@ -44,11 +42,8 @@ app.post("/api/create-file", createFileHandler(targetDirectory));
 app.post("/api/delete-files", deleteFilesHandler(targetDirectory));
 app.post("/api/open-in-explorer", openInExplorerHandler(targetDirectory));
 
-// 状態ファイルのパスを targetDirectory の .local ディレクトリ内に設定
-const stateFilePath = path.join(targetDirectory, '.local', 'file-history-state.json');
-
 // Initialize file system watcher with our custom utility
-const watcher = watchDirectory(targetDirectory, stateFilePath, {
+const watcher = watchDirectory(targetDirectory, {
   processChangedFiles: true, // 変更ファイル処理を有効化
   skipInitialProcessing: true, // 初回起動時のファイル処理をスキップ
   onNewFile: (relativePath) => {
@@ -61,7 +56,7 @@ const watcher = watchDirectory(targetDirectory, stateFilePath, {
     console.log(`[File Watcher] File deleted: ${relativePath}`);
   },
   onReady: () => {
-    console.log('[File Watcher] Initial scan complete and differences detected');
+    console.log('[File Watcher] Initial scan complete and ready for tracking changes');
   }
 });
 
@@ -76,8 +71,8 @@ serve(
     // Uncomment to auto-open browser: open(url);
     console.log(`Server is running on ${url}`);
     console.log(`Showing contents of: ${targetDirectory}`);
-    console.log(`File watching active with history tracking in .local/file-history-state.json`);
-    console.log(`File processing active - text extraction and image base64 conversion enabled`);
-    console.log(`Initial file processing skipped - new and changed files will be processed when modified`);
+    console.log(`File watching active with LanceDB tracking in .local/lancedb`);
+    console.log(`File tracking with columns: path (unique), hash, content, created_at, updated_at`);
+    console.log(`Content storage: text files as text, images as base64, other files as "null"`);
   },
 );
