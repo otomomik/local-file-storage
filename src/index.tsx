@@ -35,6 +35,23 @@ app.use(
               padding: 0.5rem;
               border-bottom: 1px solid #eee;
             }
+            .breadcrumbs {
+              margin: 1rem 0;
+              padding: 0.5rem;
+              background-color: #f8f9fa;
+              border-radius: 4px;
+            }
+            .breadcrumbs a {
+              color: #0d6efd;
+              text-decoration: none;
+            }
+            .breadcrumbs a:hover {
+              text-decoration: underline;
+            }
+            .breadcrumbs span {
+              color: #6c757d;
+              font-weight: 500;
+            }
           `}</style>
         </head>
         <body>{children}</body>
@@ -139,7 +156,7 @@ app.get("/browse/*", async (c) => {
     // Build breadcrumb navigation
     const pathParts = relativePath === '.' ? [] : relativePath.split(path.sep);
     const breadcrumbs = [
-      { name: 'Root', path: '/browse/' }
+      { name: '🏠', path: '/browse/' }
     ];
     
     let currentPath = '';
@@ -163,7 +180,11 @@ app.get("/browse/*", async (c) => {
           {breadcrumbs.map((crumb, index) => (
             <>
               {index > 0 && " / "}
-              <a href={crumb.path}>{crumb.name}</a>
+              {index === breadcrumbs.length - 1 ? (
+                <span>{crumb.name}</span>
+              ) : (
+                <a href={crumb.path}>{crumb.name}</a>
+              )}
             </>
           ))}
         </div>
