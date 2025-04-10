@@ -40,7 +40,8 @@ export const FilePreview: FC<FilePreviewProps> = ({
       </div>
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white p-4">
-        {isText && content && (
+        {/* テキストファイルの場合のみコンテンツを表示し、画像などの場合は表示しない */}
+        {isText && content && !isImage && !isAudio && !isVideo && !isPdf && (
           <div className="overflow-x-auto">
             <pre className="whitespace-pre-wrap bg-gray-50 p-4 rounded font-mono text-sm">{content}</pre>
             {isLarge && (

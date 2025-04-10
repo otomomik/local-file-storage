@@ -9,6 +9,7 @@ import open from "open";
 import { browseHandler } from "./routes/browseRoute.js";
 import { rawFileHandler } from "./routes/rawFileRoute.js";
 import { downloadHandler } from "./routes/downloadRoute.js";
+import { createDirectoryHandler, createFileHandler, uploadFileHandler } from "./routes/apiRoutes.js";
 
 // Get target directory from command line arguments
 const callingDirectory = process.argv[2] || process.cwd();
@@ -30,6 +31,11 @@ app.get("/", (c) => {
 app.get("/raw/*", rawFileHandler(targetDirectory));
 app.get("/download/*", downloadHandler(targetDirectory));
 app.get("/browse/*", browseHandler(targetDirectory));
+
+// API routes
+app.post("/api/create-directory", createDirectoryHandler(targetDirectory));
+app.post("/api/create-file", createFileHandler(targetDirectory));
+app.post("/api/upload-file", uploadFileHandler(targetDirectory));
 
 // Start server
 serve(
