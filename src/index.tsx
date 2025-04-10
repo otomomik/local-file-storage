@@ -3,16 +3,14 @@ import { Hono } from "hono";
 import { jsxRenderer } from "hono/jsx-renderer";
 import path from "path";
 import process from "process";
-import open from "open";
+// import open from "open";
 
 // Import route handlers
 import { browseHandler } from "./routes/browseRoute.js";
 import { rawFileHandler } from "./routes/rawFileRoute.js";
-import { downloadHandler } from "./routes/downloadRoute.js";
 import { 
   createDirectoryHandler, 
   createFileHandler, 
-  uploadFileHandler,
   deleteFilesHandler 
 } from "./routes/apiRoutes.js";
 
@@ -34,13 +32,11 @@ app.get("/", (c) => {
 
 // Set up routes
 app.get("/raw/*", rawFileHandler(targetDirectory));
-app.get("/download/*", downloadHandler(targetDirectory));
 app.get("/browse/*", browseHandler(targetDirectory));
 
 // API routes
 app.post("/api/create-directory", createDirectoryHandler(targetDirectory));
 app.post("/api/create-file", createFileHandler(targetDirectory));
-app.post("/api/upload-file", uploadFileHandler(targetDirectory));
 app.post("/api/delete-files", deleteFilesHandler(targetDirectory));
 
 // Start server

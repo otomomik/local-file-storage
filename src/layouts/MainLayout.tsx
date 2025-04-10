@@ -13,15 +13,6 @@ export const MainLayout: FC<MainLayoutProps> = ({ children, title = "Local File 
         <title>{title}</title>
         <script src="https://unpkg.com/htmx.org@1.9.10"></script>
         <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-        <script>
-          {`
-            tailwind.config = {
-              theme: {
-                extend: {}
-              }
-            }
-          `}
-        </script>
       </head>
       <body class="bg-gray-50 text-gray-900">
         <div class="container mx-auto px-4 py-8 max-w-6xl">

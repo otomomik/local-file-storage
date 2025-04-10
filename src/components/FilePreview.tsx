@@ -21,7 +21,6 @@ export const FilePreview: FC<FilePreviewProps> = ({
   isLarge = false 
 }) => {
   const rawUrl = `/raw/${formatUrlPath(relativePath)}`;
-  const downloadUrl = `/download/${formatUrlPath(relativePath)}`;
   const isImage = mimeType.startsWith('image/');
   const isAudio = mimeType.startsWith('audio/');
   const isVideo = mimeType.startsWith('video/');
@@ -31,12 +30,16 @@ export const FilePreview: FC<FilePreviewProps> = ({
     <div className="mt-6">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-800">File Preview</h2>
-        <a 
-          href={downloadUrl}
-          className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition"
-        >
-          Download File
-        </a>
+        <div className="flex space-x-2">
+          <button 
+            className="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700 transition"
+            onclick={`document.getElementById('delete-single-file-dialog').showModal(); 
+              document.getElementById('delete-file-name').textContent = '${fileName}';
+              document.getElementById('delete-file-path').value = '${relativePath}';`}
+          >
+            Delete File
+          </button>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white p-4">
@@ -47,9 +50,6 @@ export const FilePreview: FC<FilePreviewProps> = ({
             {isLarge && (
               <div className="mt-2 text-sm italic text-gray-600">
                 File is too large to display completely. Showing first part only.
-                <a href={downloadUrl} className="ml-1 text-blue-600 hover:underline">
-                  Download the complete file
-                </a>.
               </div>
             )}
           </div>
@@ -92,7 +92,7 @@ export const FilePreview: FC<FilePreviewProps> = ({
             <p className="mb-1">Type: {mimeType}</p>
             <p className="mb-1">Size: {(size / 1024).toFixed(2)} KB</p>
             <p className="mt-4 text-gray-700">
-              This file type cannot be previewed. Use the download button to access it.
+              This file type cannot be previewed.
             </p>
           </div>
         )}
