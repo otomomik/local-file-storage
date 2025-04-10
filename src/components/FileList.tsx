@@ -12,6 +12,9 @@ type FileListProps = {
 };
 
 export const FileList: FC<FileListProps> = ({ files, relativePath }) => {
+  // .で始まるファイルやディレクトリを除外
+  const filteredFiles = files.filter(file => !file.name.startsWith('.'));
+
   // Format the URL path for linking
   const getFileUrl = (file: FileItem) => {
     const urlPath = relativePath === '.' ? file.name : `${relativePath}/${file.name}`;
@@ -41,7 +44,7 @@ export const FileList: FC<FileListProps> = ({ files, relativePath }) => {
           </li>
         )}
         
-        {files.map((file, index) => (
+        {filteredFiles.map((file, index) => (
           <li key={index} className="flex items-center p-3 hover:bg-gray-50">
             <div className="flex items-center mr-2">
               <input
