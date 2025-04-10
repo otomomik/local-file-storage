@@ -19,6 +19,11 @@ export const FileList: FC<FileListProps> = ({ files, relativePath }) => {
     return `/browse/${encodedPath}`;
   };
 
+  // Get relative file path for form submission
+  const getRelativeFilePath = (file: FileItem) => {
+    return relativePath === '.' ? file.name : `${relativePath}/${file.name}`;
+  };
+
   return (
     <div className="mt-5">
       <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
@@ -26,7 +31,7 @@ export const FileList: FC<FileListProps> = ({ files, relativePath }) => {
           <li className="flex items-center p-3 hover:bg-gray-50">
             <a 
               href={`/browse/${relativePath.split('/').slice(0, -1).join('/')}`}
-              className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 hover:underline"
+              className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 hover:underline w-full"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
@@ -38,9 +43,19 @@ export const FileList: FC<FileListProps> = ({ files, relativePath }) => {
         
         {files.map((file, index) => (
           <li key={index} className="flex items-center p-3 hover:bg-gray-50">
+            <div className="flex items-center mr-2">
+              <input
+                type="checkbox"
+                name="selected_files"
+                value={getRelativeFilePath(file)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                onclick="event.stopPropagation();"
+                data-filename={file.name}
+              />
+            </div>
             <a 
               href={getFileUrl(file)} 
-              className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 hover:underline"
+              className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 hover:underline flex-grow"
             >
               {file.isDirectory ? (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">

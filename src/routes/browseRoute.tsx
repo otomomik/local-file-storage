@@ -110,6 +110,18 @@ export const browseHandler = (targetDirectory: string) => {
             
             <div className="flex space-x-2">
               <button
+                id="delete-selected-btn"
+                className="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition flex items-center opacity-50 cursor-not-allowed"
+                disabled
+                onclick="handleDeleteSelected()"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                Delete Selected
+              </button>
+              
+              <button
                 className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center"
                 onclick="document.getElementById('create-file-dialog').showModal()"
               >
@@ -150,12 +162,80 @@ export const browseHandler = (targetDirectory: string) => {
           {/* Include the dialogs for file operations */}
           <FileOperationDialogs currentPath={relativePath} />
           
-          {/* Script to reload page after successful operation */}
+          {/* Script for checkbox selection and delete functionality */}
           <script dangerouslySetInnerHTML={{ __html: `
-            document.addEventListener('fileOperation', function(e) {
-              setTimeout(function() {
-                window.location.reload();
-              }, 300);
+            document.addEventListener('DOMContentLoaded', function() {
+              const deleteButton = document.getElementById('delete-selected-btn');
+              const checkboxes = document.querySelectorAll('input[name="selected_files"]');
+              const selectedFilesList = document.getElementById('selected-files-list');
+              const deleteConfirmButton = document.getElementById('delete-confirm-button');
+              const deleteForm = document.getElementById('delete-files-form');
+              
+              // Handle checkbox changes
+              function updateSelectedFilesStatus() {
+                const selectedCheckboxes = document.querySelectorAll('input[name="selected_files"]:checked');
+                const count = selectedCheckboxes.length;
+                
+                // Enable or disable delete button
+                if (count > 0) {
+                  deleteButton.disabled = false;
+                  deleteButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                  deleteConfirmButton.disabled = false;
+                } else {
+                  deleteButton.disabled = true;
+                  deleteButton.classList.add('opacity-50', 'cursor-not-allowed');
+                  deleteConfirmButton.disabled = true;
+                }
+              }
+              
+              // Add event listener to all checkboxes
+              checkboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', updateSelectedFilesStatus);
+              });
+              
+              // Global function to open delete dialog
+              window.handleDeleteSelected = function() {
+                // Clear any previous hidden inputs for files
+                const previousHiddenInputs = deleteForm.querySelectorAll('input[name="files"]');
+                previousHiddenInputs.forEach(input => input.remove());
+                
+                // Get selected checkboxes
+                const selectedCheckboxes = document.querySelectorAll('input[name="selected_files"]:checked');
+                const count = selectedCheckboxes.length;
+                
+                // Update selected files list in dialog
+                if (count > 0) {
+                  let html = '<ul class="list-disc pl-5">';
+                  
+                  // Add each selected file to the list and create hidden inputs
+                  selectedCheckboxes.forEach(checkbox => {
+                    const filename = checkbox.getAttribute('data-filename');
+                    const filePath = checkbox.value;
+                    
+                    // Add to visual list
+                    html += '<li>';
+                    html += '<div class="flex items-center justify-between">';
+                    html += '<span class="text-sm">' + filename + '</span>';
+                    html += '</div>';
+                    html += '</li>';
+                    
+                    // Add hidden input with selected file path
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = 'files';
+                    hiddenInput.value = filePath;
+                    deleteForm.appendChild(hiddenInput);
+                  });
+                  
+                  html += '</ul>';
+                  selectedFilesList.innerHTML = html;
+                } else {
+                  selectedFilesList.innerHTML = '<p>No files selected</p>';
+                }
+                
+                // Show the dialog
+                document.getElementById('multi-delete-dialog').showModal();
+              };
             });
             
             // 操作結果メッセージを表示した後、URLからパラメータを削除
@@ -165,6 +245,13 @@ export const browseHandler = (targetDirectory: string) => {
               url.searchParams.delete('status');
               window.history.replaceState({}, '', url);
             }
+            
+            // Add fileOperation event handling
+            document.addEventListener('fileOperation', function(e) {
+              setTimeout(function() {
+                window.location.reload();
+              }, 300);
+            });
           `}} />
         </MainLayout>
       );

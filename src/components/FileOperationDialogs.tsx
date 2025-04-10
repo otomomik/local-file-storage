@@ -152,6 +152,43 @@ export const FileOperationDialogs: FC<FileOperationDialogsProps> = ({ currentPat
           </form>
         </div>
       </dialog>
+
+      {/* Multi-delete Dialog */}
+      <dialog id="multi-delete-dialog" className="p-0 rounded-lg shadow-lg border border-gray-300">
+        <div className="p-5 w-96">
+          <h3 className="text-lg font-bold mb-4">Delete Selected Files</h3>
+          <form 
+            method="post"
+            action="/api/delete-files"
+            id="delete-files-form"
+          >
+            <input type="hidden" name="path" value={currentPath} />
+            <div id="selected-files-list" className="mb-4 max-h-40 overflow-y-auto">
+              <p>No files selected</p>
+            </div>
+            <div className="bg-red-50 p-3 rounded mb-4">
+              <p className="text-red-600 text-sm">Warning: This action cannot be undone!</p>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button
+                type="button"
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition"
+                onclick="this.closest('dialog').close()"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                id="delete-confirm-button"
+                disabled
+              >
+                Delete
+              </button>
+            </div>
+          </form>
+        </div>
+      </dialog>
     </>
   );
 };
