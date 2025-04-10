@@ -14,10 +14,20 @@ import {
   buildBreadcrumbs, 
   formatUrlPath 
 } from "../utils/fileUtils.js";
+import { getCurrentLanguage, createTranslator } from "../utils/i18n.js";
+import { commonTranslations } from "../translations/common.js";
+import { componentTranslations } from "../translations/components.js";
 
 export const browseHandler = (targetDirectory: string) => {
   return async (c: Context) => {
     try {
+      // Get current language from context
+      const language = getCurrentLanguage(c);
+      
+      // Create translators
+      const t = createTranslator(language, commonTranslations);
+      const ct = createTranslator(language, componentTranslations);
+      
       // Get the path from the URL
       const urlPath = c.req.path.replace(/^\/browse/, "") || "/";
       
@@ -59,10 +69,10 @@ export const browseHandler = (targetDirectory: string) => {
           
           // Render file preview
           return c.render(
-            <MainLayout title={`Preview: ${fileName}`}>
-              <NavigationMenu currentPage="browse" />
-              <h1 className="text-2xl font-bold mb-4">File Preview: {fileName}</h1>
-              <Breadcrumbs items={breadcrumbs} currentName={fileName} />
+            <MainLayout title={`${t('app.fileViewer.title')}: ${fileName}`} language={language}>
+              <NavigationMenu currentPage="browse" language={language} />
+              <h1 className="text-2xl font-bold mb-4">{t('app.fileViewer.title')}: {fileName}</h1>
+              <Breadcrumbs items={breadcrumbs} currentName={fileName} language={language} />
               <FilePreview
                 fileName={fileName}
                 mimeType={mimeType}
@@ -71,26 +81,27 @@ export const browseHandler = (targetDirectory: string) => {
                 content={textContent}
                 isText={isText}
                 isLarge={isLarge}
+                language={language}
               />
               
               {/* 詳細ページにもダイアログを含める */}
-              <FileOperationDialogs currentPath={parentDirPath} />
+              <FileOperationDialogs currentPath={parentDirPath} language={language} />
             </MainLayout>
           );
         }
       } catch (error) {
         return c.render(
-          <MainLayout title="Error">
-            <NavigationMenu currentPage="browse" />
+          <MainLayout title={t('app.error.title')} language={language}>
+            <NavigationMenu currentPage="browse" language={language} />
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-              <h1 className="font-bold">Error</h1>
-              <p>Path not found: {relativePath}</p>
+              <h1 className="font-bold">{t('error.title')}</h1>
+              <p>{ct('error.pathNotFound').replace('{path}', relativePath)}</p>
             </div>
             <a 
               href="/browse/" 
               className="text-blue-600 hover:text-blue-800 hover:underline"
             >
-              Return to root
+              {ct('error.returnToRoot')}
             </a>
           </MainLayout>
         );
@@ -104,17 +115,10 @@ export const browseHandler = (targetDirectory: string) => {
       const message = c.req.query('message');
       const status = c.req.query('status') || 'success';
       
-      // 現在のディレクトリのパスを表示用に整形
-      // ルートディレクトリの場合は直接targetDirectoryを使用
-      const displayPath = relativePath === '.' 
-        ? targetDirectory 
-        : path.join(targetDirectory, relativePath);
-      
       return c.render(
-        <MainLayout title="Local File System">
-          <NavigationMenu currentPage="browse" />
-          <h1 className="text-2xl font-bold mb-4">Local File System</h1>
-          <p className="text-gray-600 mb-4">Browsing: {displayPath}</p>
+        <MainLayout title={t('app.title')} language={language}>
+          <NavigationMenu currentPage="browse" language={language} />
+          <h1 className="text-2xl font-bold mb-4">{t('app.title')}</h1>
           
           {/* 操作結果メッセージがある場合は表示 */}
           {message && (
@@ -126,7 +130,8 @@ export const browseHandler = (targetDirectory: string) => {
           <div className="flex justify-between items-center mb-4">
             <Breadcrumbs 
               items={breadcrumbs.slice(0, -1)} 
-              currentName={relativePath === '.' ? 'Home' : path.basename(relativePath)} 
+              currentName={relativePath === '.' ? 'Home' : path.basename(relativePath)}
+              language={language}
             />
             
             <div className="flex space-x-2">
@@ -134,12 +139,12 @@ export const browseHandler = (targetDirectory: string) => {
                 id="open-in-explorer-btn"
                 className="px-3 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition flex items-center"
                 onclick={`openInExplorer('${relativePath}')`}
-                title="Open current directory in system explorer"
+                title={language === 'en' ? "Open current directory in system explorer" : "現在のディレクトリをエクスプローラで開く"}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
-                Open in Explorer
+                {t('file.openInExplorer')}
               </button>
               
               <button
@@ -151,7 +156,7 @@ export const browseHandler = (targetDirectory: string) => {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
-                Delete Selected
+                {t('file.deleteSelected')}
               </button>
               
               <button
@@ -162,7 +167,7 @@ export const browseHandler = (targetDirectory: string) => {
                   <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2h-1.528A6 6 0 004 9.528V4z" />
                   <path fillRule="evenodd" d="M8 10a.75.75 0 01.75.75v1.5h1.5a.75.75 0 010 1.5h-1.5v1.5a.75.75 0 01-1.5 0v-1.5h-1.5a.75.75 0 010-1.5h1.5v-1.5A.75.75 0 018 10z" clipRule="evenodd" />
                 </svg>
-                New File
+                {t('file.newFile')}
               </button>
               
               <button
@@ -172,7 +177,7 @@ export const browseHandler = (targetDirectory: string) => {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
                 </svg>
-                New Folder
+                {t('file.newFolder')}
               </button>
             </div>
           </div>
@@ -181,10 +186,11 @@ export const browseHandler = (targetDirectory: string) => {
             files={files} 
             relativePath={relativePath} 
             showDotFiles={isExplicitRequest}
+            language={language}
           />
           
           {/* Include the dialogs for file operations */}
-          <FileOperationDialogs currentPath={relativePath} />
+          <FileOperationDialogs currentPath={relativePath} language={language} />
           
           {/* Script for checkbox selection and delete functionality */}
           <script dangerouslySetInnerHTML={{ __html: `
@@ -299,18 +305,25 @@ export const browseHandler = (targetDirectory: string) => {
         </MainLayout>
       );
     } catch (error) {
+      // Get current language from context
+      const language = getCurrentLanguage(c);
+      
+      // Create translators
+      const t = createTranslator(language, commonTranslations);
+      const ct = createTranslator(language, componentTranslations);
+      
       return c.render(
-        <MainLayout title="Error">
-          <NavigationMenu currentPage="browse" />
+        <MainLayout title={t('app.error.title')} language={language}>
+          <NavigationMenu currentPage="browse" language={language} />
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <h1 className="font-bold">Error</h1>
-            <p>Failed to access path: {String(error)}</p>
+            <h1 className="font-bold">{t('error.title')}</h1>
+            <p>{t('message.error.generic')}: {String(error)}</p>
           </div>
           <a 
             href="/browse/" 
             className="text-blue-600 hover:text-blue-800 hover:underline"
           >
-            Return to root
+            {ct('error.returnToRoot')}
           </a>
         </MainLayout>
       );

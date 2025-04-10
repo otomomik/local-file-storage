@@ -1,4 +1,6 @@
 import { type FC } from "hono/jsx";
+import { type Language, createTranslator } from "../utils/i18n.js";
+import { commonTranslations } from "../translations/common.js";
 
 export type BreadcrumbItem = {
   name: string;
@@ -8,9 +10,13 @@ export type BreadcrumbItem = {
 type BreadcrumbsProps = {
   items: BreadcrumbItem[];
   currentName?: string;
+  language: Language;
 };
 
-export const Breadcrumbs: FC<BreadcrumbsProps> = ({ items, currentName }) => {
+export const Breadcrumbs: FC<BreadcrumbsProps> = ({ items, currentName, language }) => {
+  // Create translator function
+  const t = createTranslator(language, commonTranslations);
+
   return (
     <nav className="flex py-3 px-4 mb-4 bg-gray-100 rounded-md">
       <ol className="inline-flex items-center space-x-1 md:space-x-3">
@@ -21,7 +27,7 @@ export const Breadcrumbs: FC<BreadcrumbsProps> = ({ items, currentName }) => {
               href={item.path} 
               className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline"
             >
-              {item.name}
+              {item.name === '🏠' ? '🏠' : item.name}
             </a>
           </li>
         ))}

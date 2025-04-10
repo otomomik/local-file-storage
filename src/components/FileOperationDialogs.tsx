@@ -1,11 +1,19 @@
 import { type FC } from "hono/jsx";
 import path from "path";
+import { type Language, createTranslator } from "../utils/i18n.js";
+import { commonTranslations } from "../translations/common.js";
+import { componentTranslations } from "../translations/components.js";
 
 type FileOperationDialogsProps = {
   currentPath: string;
+  language: Language;
 };
 
-export const FileOperationDialogs: FC<FileOperationDialogsProps> = ({ currentPath }) => {
+export const FileOperationDialogs: FC<FileOperationDialogsProps> = ({ currentPath, language }) => {
+  // Create translator functions
+  const t = createTranslator(language, commonTranslations);
+  const ct = createTranslator(language, componentTranslations);
+  
   return (
     <>
       {/* ダイアログスタイル用のグローバルCSSを追加 */}
@@ -29,20 +37,20 @@ export const FileOperationDialogs: FC<FileOperationDialogsProps> = ({ currentPat
       {/* Create Directory Dialog */}
       <dialog id="create-directory-dialog" className="p-0 rounded-lg shadow-lg border border-gray-300">
         <div className="p-5 w-80">
-          <h3 className="text-lg font-bold mb-4">Create Directory</h3>
+          <h3 className="text-lg font-bold mb-4">{ct('createDir.title')}</h3>
           <form 
             method="post"
             action="/api/create-directory"
           >
             <input type="hidden" name="path" value={currentPath} />
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Directory Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.directoryName')}</label>
               <input
                 type="text"
                 name="name"
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter directory name"
+                placeholder={ct('createDir.placeholder')}
               />
             </div>
             <div className="flex justify-end space-x-2">
@@ -51,13 +59,13 @@ export const FileOperationDialogs: FC<FileOperationDialogsProps> = ({ currentPat
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition"
                 onclick="this.closest('dialog').close()"
               >
-                Cancel
+                {t('button.cancel')}
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
               >
-                Create
+                {t('button.create')}
               </button>
             </div>
           </form>
@@ -67,29 +75,29 @@ export const FileOperationDialogs: FC<FileOperationDialogsProps> = ({ currentPat
       {/* Create File Dialog */}
       <dialog id="create-file-dialog" className="p-0 rounded-lg shadow-lg border border-gray-300">
         <div className="p-5 w-96">
-          <h3 className="text-lg font-bold mb-4">Create File</h3>
+          <h3 className="text-lg font-bold mb-4">{ct('createFile.title')}</h3>
           <form 
             method="post"
             action="/api/create-file"
           >
             <input type="hidden" name="path" value={currentPath} />
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">File Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.fileName')}</label>
               <input
                 type="text"
                 name="name"
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter file name"
+                placeholder={ct('createFile.namePlaceholder')}
               />
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.content')}</label>
               <textarea
                 name="content"
                 rows={6}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter file content (optional)"
+                placeholder={ct('createFile.contentPlaceholder')}
               />
             </div>
             <div className="flex justify-end space-x-2">
@@ -98,13 +106,13 @@ export const FileOperationDialogs: FC<FileOperationDialogsProps> = ({ currentPat
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition"
                 onclick="this.closest('dialog').close()"
               >
-                Cancel
+                {t('button.cancel')}
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
               >
-                Create
+                {t('button.create')}
               </button>
             </div>
           </form>
@@ -114,7 +122,7 @@ export const FileOperationDialogs: FC<FileOperationDialogsProps> = ({ currentPat
       {/* Multi-delete Dialog */}
       <dialog id="multi-delete-dialog" className="p-0 rounded-lg shadow-lg border border-gray-300">
         <div className="p-5 w-96">
-          <h3 className="text-lg font-bold mb-4">Delete Selected Files</h3>
+          <h3 className="text-lg font-bold mb-4">{ct('delete.title')}</h3>
           <form 
             method="post"
             action="/api/delete-files"
@@ -122,10 +130,10 @@ export const FileOperationDialogs: FC<FileOperationDialogsProps> = ({ currentPat
           >
             <input type="hidden" name="path" value={currentPath} />
             <div id="selected-files-list" className="mb-4 max-h-40 overflow-y-auto">
-              <p>No files selected</p>
+              <p>{ct('delete.noSelection')}</p>
             </div>
             <div className="bg-red-50 p-3 rounded mb-4">
-              <p className="text-red-600 text-sm">Warning: This action cannot be undone!</p>
+              <p className="text-red-600 text-sm">{t('message.warning.deleteConfirmation')}</p>
             </div>
             <div className="flex justify-end space-x-2">
               <button
@@ -133,7 +141,7 @@ export const FileOperationDialogs: FC<FileOperationDialogsProps> = ({ currentPat
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition"
                 onclick="this.closest('dialog').close()"
               >
-                Cancel
+                {t('button.cancel')}
               </button>
               <button
                 type="submit"
@@ -141,7 +149,7 @@ export const FileOperationDialogs: FC<FileOperationDialogsProps> = ({ currentPat
                 id="delete-confirm-button"
                 disabled
               >
-                Delete
+                {t('button.delete')}
               </button>
             </div>
           </form>
@@ -151,7 +159,7 @@ export const FileOperationDialogs: FC<FileOperationDialogsProps> = ({ currentPat
       {/* Delete Single File Dialog */}
       <dialog id="delete-single-file-dialog" className="p-0 rounded-lg shadow-lg border border-gray-300">
         <div className="p-5 w-96">
-          <h3 className="text-lg font-bold mb-4">Delete File</h3>
+          <h3 className="text-lg font-bold mb-4">{t('file.delete')}</h3>
           <form 
             method="post"
             action="/api/delete-files"
@@ -160,11 +168,11 @@ export const FileOperationDialogs: FC<FileOperationDialogsProps> = ({ currentPat
             {/* ファイルパスの情報を格納するフィールド */}
             <input type="hidden" name="fileToDelete" id="delete-file-path" value="" />
             <div className="mb-4">
-              <p>Are you sure you want to delete this file?</p>
-              <p className="font-semibold mt-2">File: <span id="delete-file-name"></span></p>
+              <p>{ct('delete.confirmation')}</p>
+              <p className="font-semibold mt-2">{ct('delete.file')} <span id="delete-file-name"></span></p>
             </div>
             <div className="bg-red-50 p-3 rounded mb-4">
-              <p className="text-red-600 text-sm">Warning: This action cannot be undone!</p>
+              <p className="text-red-600 text-sm">{t('message.warning.deleteConfirmation')}</p>
             </div>
             <div className="flex justify-end space-x-2">
               <button
@@ -172,13 +180,13 @@ export const FileOperationDialogs: FC<FileOperationDialogsProps> = ({ currentPat
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition"
                 onclick="this.closest('dialog').close()"
               >
-                Cancel
+                {t('button.cancel')}
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
               >
-                Delete
+                {t('button.delete')}
               </button>
             </div>
           </form>

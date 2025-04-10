@@ -4,11 +4,21 @@ import { NavigationMenu } from "../components/NavigationMenu.js";
 import { DataTable } from "../components/DataTable.js";
 import { SearchBox } from "../components/SearchBox.js";
 import { LanceDbManager, type SearchType } from "../utils/lanceDbManager.js";
+import { getCurrentLanguage, createTranslator } from "../utils/i18n.js";
+import { commonTranslations } from "../translations/common.js";
+import { componentTranslations } from "../translations/components.js";
 import path from "path";
 
 export const viewerHandler = (targetDirectory: string) => {
   return async (c: Context) => {
     try {
+      // Get current language from context
+      const language = getCurrentLanguage(c);
+      
+      // Create translators
+      const t = createTranslator(language, commonTranslations);
+      const ct = createTranslator(language, componentTranslations);
+      
       // LanceDbManagerのインスタンスを作成
       const lanceDbManager = new LanceDbManager(targetDirectory);
       
@@ -30,17 +40,17 @@ export const viewerHandler = (targetDirectory: string) => {
       const tableOpened = await lanceDbManager.openTable(tableName);
       if (!tableOpened) {
         return c.render(
-          <MainLayout title="Error - DB Viewer">
-            <NavigationMenu currentPage="viewer" />
+          <MainLayout title={`${t('app.error.title')} - ${t('nav.dbViewer')}`} language={language}>
+            <NavigationMenu currentPage="viewer" language={language} />
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-              <h1 className="font-bold">エラー</h1>
-              <p>テーブル '{tableName}' が見つかりませんでした。</p>
+              <h1 className="font-bold">{t('error.title')}</h1>
+              <p>{ct('error.tableNotFound').replace('{tableName}', tableName)}</p>
             </div>
             <a 
               href="/browse/" 
               className="text-blue-600 hover:text-blue-800 hover:underline"
             >
-              ファイルブラウザに戻る
+              {ct('error.returnToFileBrowser')}
             </a>
           </MainLayout>
         );
@@ -98,7 +108,7 @@ export const viewerHandler = (targetDirectory: string) => {
       if (currentPage > 1) {
         paginationLinks.push({
           page: currentPage - 1,
-          label: '前へ',
+          label: ct('table.pagination.prev'),
           url: buildUrl({ page: currentPage - 1 })
         });
       }
@@ -148,19 +158,19 @@ export const viewerHandler = (targetDirectory: string) => {
       if (currentPage < totalPages) {
         paginationLinks.push({
           page: currentPage + 1,
-          label: '次へ',
+          label: ct('table.pagination.next'),
           url: buildUrl({ page: currentPage + 1 })
         });
       }
       
       return c.render(
-        <MainLayout title="DB Viewer - Local File Storage">
-          <NavigationMenu currentPage="viewer" />
-          <h1 className="text-2xl font-bold mb-4">データベースビューワー</h1>
+        <MainLayout title={`${t('app.dbViewer.title')} - ${t('app.title')}`} language={language}>
+          <NavigationMenu currentPage="viewer" language={language} />
+          <h1 className="text-2xl font-bold mb-4">{t('app.dbViewer.title')}</h1>
           
           {/* Table selector */}
           <div className="mb-6">
-            <label htmlFor="table-select" className="block text-sm font-medium text-gray-700 mb-1">テーブル選択:</label>
+            <label htmlFor="table-select" className="block text-sm font-medium text-gray-700 mb-1">{ct('table.select')}</label>
             <select 
               id="table-select"
               className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -177,7 +187,8 @@ export const viewerHandler = (targetDirectory: string) => {
           <SearchBox 
             searchQuery={searchQuery} 
             searchType={searchType}
-            tableName={tableName} 
+            tableName={tableName}
+            language={language}
           />
           
           {/* 総レコード数と表示範囲のみ表示 */}
@@ -193,7 +204,8 @@ export const viewerHandler = (targetDirectory: string) => {
               <DataTable 
                 records={records} 
                 sortField={sortField} 
-                sortDirection={sortDirection as 'asc' | 'desc'} 
+                sortDirection={sortDirection as 'asc' | 'desc'}
+                language={language}
               />
             </div>
           </div>
@@ -232,18 +244,25 @@ export const viewerHandler = (targetDirectory: string) => {
         </MainLayout>
       );
     } catch (error) {
+      // Get current language from context
+      const language = getCurrentLanguage(c);
+      
+      // Create translators
+      const t = createTranslator(language, commonTranslations);
+      const ct = createTranslator(language, componentTranslations);
+      
       return c.render(
-        <MainLayout title="Error - DB Viewer">
-          <NavigationMenu currentPage="viewer" />
+        <MainLayout title={`${t('app.error.title')} - ${t('nav.dbViewer')}`} language={language}>
+          <NavigationMenu currentPage="viewer" language={language} />
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <h1 className="font-bold">エラー</h1>
-            <p>DBデータの取得に失敗しました: {String(error)}</p>
+            <h1 className="font-bold">{t('error.title')}</h1>
+            <p>{ct('error.dbFetchFailed').replace('{error}', String(error))}</p>
           </div>
           <a 
             href="/browse/" 
             className="text-blue-600 hover:text-blue-800 hover:underline"
           >
-            ファイルブラウザに戻る
+            {ct('error.returnToFileBrowser')}
           </a>
         </MainLayout>
       );

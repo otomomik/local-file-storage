@@ -1,4 +1,6 @@
 import { type FC } from "hono/jsx";
+import { type Language, createTranslator } from "../utils/i18n.js";
+import { commonTranslations } from "../translations/common.js";
 
 export type FileItem = {
   name: string;
@@ -10,9 +12,13 @@ type FileListProps = {
   files: FileItem[];
   relativePath: string;
   showDotFiles?: boolean;
+  language: Language;
 };
 
-export const FileList: FC<FileListProps> = ({ files, relativePath, showDotFiles = false }) => {
+export const FileList: FC<FileListProps> = ({ files, relativePath, showDotFiles = false, language }) => {
+  // Create a translator function
+  const t = createTranslator(language, commonTranslations);
+
   // Only filter out dot files if showDotFiles is false
   const filteredFiles = showDotFiles 
     ? files 
@@ -42,7 +48,7 @@ export const FileList: FC<FileListProps> = ({ files, relativePath, showDotFiles 
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
               </svg>
-              <span>Parent Directory</span>
+              <span>{t('file.parentDirectory')}</span>
             </a>
           </li>
         )}

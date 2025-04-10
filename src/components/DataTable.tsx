@@ -1,17 +1,24 @@
 import { type FC } from "hono/jsx";
 import type { FileReferenceData } from "../utils/lanceDbManager.js";
+import { type Language, createTranslator } from "../utils/i18n.js";
+import { componentTranslations } from "../translations/components.js";
 
 type DataTableProps = {
   records: FileReferenceData[];
   sortField?: string;
   sortDirection?: 'asc' | 'desc';
+  language: Language;
 };
 
 export const DataTable: FC<DataTableProps> = ({ 
   records, 
   sortField = 'path', 
-  sortDirection = 'asc' 
+  sortDirection = 'asc',
+  language
 }) => {
+  // Create a translator function with the current language
+  const t = createTranslator(language, componentTranslations);
+
   // ソート済みのレコードを準備
   const sortedRecords = [...records].sort((a, b) => {
     const fieldA = (a[sortField] || '').toString();
@@ -24,10 +31,10 @@ export const DataTable: FC<DataTableProps> = ({
 
   // コンテンツ長の整形（最初の50文字だけ表示）
   const formatContent = (content: string): string => {
-    if (!content) return '(empty)';
+    if (!content) return t('table.content.empty');
     
     if (content === 'null') {
-      return '(binary data)';
+      return t('table.content.binary');
     }
     
     if (content.length > 50) {
@@ -67,19 +74,19 @@ export const DataTable: FC<DataTableProps> = ({
         <thead className="bg-gray-50">
           <tr>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              ファイルパス
+              {t('table.column.path')}
             </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              コンテンツプレビュー
+              {t('table.column.preview')}
             </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              メタデータ
+              {t('table.column.metadata')}
             </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              作成日時
+              {t('table.column.created')}
             </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              更新日時
+              {t('table.column.updated')}
             </th>
           </tr>
         </thead>
@@ -116,7 +123,7 @@ export const DataTable: FC<DataTableProps> = ({
           {sortedRecords.length === 0 && (
             <tr>
               <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
-                データがありません
+                {t('message.noData')}
               </td>
             </tr>
           )}

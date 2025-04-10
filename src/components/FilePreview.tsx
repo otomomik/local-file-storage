@@ -1,5 +1,8 @@
 import { type FC } from "hono/jsx";
 import { formatUrlPath } from "../utils/fileUtils.js";
+import { type Language, createTranslator } from "../utils/i18n.js";
+import { commonTranslations } from "../translations/common.js";
+import { componentTranslations } from "../translations/components.js";
 
 type FilePreviewProps = {
   fileName: string;
@@ -9,6 +12,7 @@ type FilePreviewProps = {
   content?: string;
   isText: boolean;
   isLarge?: boolean;
+  language: Language;
 };
 
 export const FilePreview: FC<FilePreviewProps> = ({ 
@@ -18,8 +22,13 @@ export const FilePreview: FC<FilePreviewProps> = ({
   size, 
   content, 
   isText, 
-  isLarge = false 
+  isLarge = false,
+  language
 }) => {
+  // Create translator functions
+  const t = createTranslator(language, commonTranslations);
+  const ct = createTranslator(language, componentTranslations);
+  
   const rawUrl = `/raw/${formatUrlPath(relativePath)}`;
   const isImage = mimeType.startsWith('image/');
   const isAudio = mimeType.startsWith('audio/');
@@ -29,7 +38,7 @@ export const FilePreview: FC<FilePreviewProps> = ({
   return (
     <div className="mt-6">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-800">File Preview</h2>
+        <h2 className="text-xl font-semibold text-gray-800">{t('app.fileViewer.title')}</h2>
         <div className="flex space-x-2">
           <button 
             className="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700 transition"
@@ -37,7 +46,7 @@ export const FilePreview: FC<FilePreviewProps> = ({
               document.getElementById('delete-file-name').textContent = '${fileName}';
               document.getElementById('delete-file-path').value = '${relativePath}';`}
           >
-            Delete File
+            {t('file.delete')}
           </button>
         </div>
       </div>
@@ -49,7 +58,9 @@ export const FilePreview: FC<FilePreviewProps> = ({
             <pre className="whitespace-pre-wrap bg-gray-50 p-4 rounded font-mono text-sm">{content}</pre>
             {isLarge && (
               <div className="mt-2 text-sm italic text-gray-600">
-                File is too large to display completely. Showing first part only.
+                {language === 'en' 
+                  ? "File is too large to display completely. Showing first part only." 
+                  : "ファイルが大きすぎて完全に表示できません。最初の部分のみ表示しています。"}
               </div>
             )}
           </div>
@@ -65,7 +76,9 @@ export const FilePreview: FC<FilePreviewProps> = ({
           <div className="flex justify-center py-4">
             <audio controls className="w-full max-w-md">
               <source src={rawUrl} type={mimeType} />
-              Your browser does not support the audio element.
+              {language === 'en'
+                ? "Your browser does not support the audio element."
+                : "お使いのブラウザはオーディオ要素をサポートしていません。"}
             </audio>
           </div>
         )}
@@ -74,7 +87,9 @@ export const FilePreview: FC<FilePreviewProps> = ({
           <div className="flex justify-center">
             <video controls className="w-full max-w-2xl">
               <source src={rawUrl} type={mimeType} />
-              Your browser does not support the video element.
+              {language === 'en'
+                ? "Your browser does not support the video element."
+                : "お使いのブラウザはビデオ要素をサポートしていません。"}
             </video>
           </div>
         )}
@@ -87,12 +102,14 @@ export const FilePreview: FC<FilePreviewProps> = ({
 
         {!isText && !isImage && !isAudio && !isVideo && !isPdf && (
           <div className="bg-gray-50 p-4 rounded">
-            <h3 className="mb-2 font-medium">File Information</h3>
-            <p className="mb-1">Name: {fileName}</p>
-            <p className="mb-1">Type: {mimeType}</p>
-            <p className="mb-1">Size: {(size / 1024).toFixed(2)} KB</p>
+            <h3 className="mb-2 font-medium">{language === 'en' ? "File Information" : "ファイル情報"}</h3>
+            <p className="mb-1">{language === 'en' ? "Name: " : "ファイル名: "}{fileName}</p>
+            <p className="mb-1">{language === 'en' ? "Type: " : "種類: "}{mimeType}</p>
+            <p className="mb-1">{language === 'en' ? "Size: " : "サイズ: "}{(size / 1024).toFixed(2)} KB</p>
             <p className="mt-4 text-gray-700">
-              This file type cannot be previewed.
+              {language === 'en'
+                ? "This file type cannot be previewed."
+                : "このファイルタイプはプレビューできません。"}
             </p>
           </div>
         )}

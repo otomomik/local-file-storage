@@ -1,10 +1,16 @@
 import { type FC } from "hono/jsx";
+import { type Language, createTranslator } from "../utils/i18n.js";
+import { commonTranslations } from "../translations/common.js";
 
 type NavigationMenuProps = {
   currentPage: string;
+  language: Language;
 };
 
-export const NavigationMenu: FC<NavigationMenuProps> = ({ currentPage }) => {
+export const NavigationMenu: FC<NavigationMenuProps> = ({ currentPage, language }) => {
+  // Create a translator function with the current language
+  const t = createTranslator(language, commonTranslations);
+
   return (
     <div className="mb-6 bg-white rounded-lg shadow">
       <nav className="flex">
@@ -14,7 +20,7 @@ export const NavigationMenu: FC<NavigationMenuProps> = ({ currentPage }) => {
             ? 'text-blue-600 border-b-2 border-blue-600' 
             : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}
         >
-          ファイルブラウザ
+          {t('nav.fileBrowser')}
         </a>
         <a 
           href="/viewer" 
@@ -22,7 +28,7 @@ export const NavigationMenu: FC<NavigationMenuProps> = ({ currentPage }) => {
             ? 'text-blue-600 border-b-2 border-blue-600' 
             : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}
         >
-          DBビューワー
+          {t('nav.dbViewer')}
         </a>
       </nav>
     </div>

@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { jsxRenderer } from "hono/jsx-renderer";
+import { getCookie } from "hono/cookie";
 import path from "path";
 import process from "process";
 import fs from "fs";
@@ -17,6 +18,7 @@ import {
   openInExplorerHandler 
 } from "./routes/apiRoutes.js";
 import { watchDirectory } from "./utils/fileWatcher.js";
+import { getCurrentLanguage } from "./utils/i18n.js";
 
 // Function to determine file type based on extension
 function getFileTypeFromExtension(extension: string): string {
@@ -70,6 +72,12 @@ console.log(`Target directory set to: ${targetDirectory}`);
 
 // Initialize Hono app
 const app = new Hono();
+
+// Add cookie middleware
+app.use('*', async (c, next) => {
+  // Add language parameter to context
+  await next();
+});
 
 // Use JSX renderer
 app.use(jsxRenderer());

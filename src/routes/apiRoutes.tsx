@@ -2,13 +2,29 @@ import { type Context } from "hono";
 import fs from "fs/promises";
 import path from "path";
 import { resolvePath } from "../utils/fileUtils.js";
+import { getCurrentLanguage, createTranslator } from "../utils/i18n.js";
+import { apiMessages } from "../translations/apiMessages.js";
 import open from "open";
 
 // ユーザーが現在いるディレクトリへのリダイレクト用関数
-const redirectWithMessage = (c: Context, path: string, message: string, isError = false) => {
+const redirectWithMessage = (c: Context, path: string, messageKey: string, replacements: Record<string, string> = {}, isError = false) => {
+  const language = getCurrentLanguage(c);
+  const t = createTranslator(language, apiMessages);
+  
+  // Get the message from translations
+  let message = t(messageKey);
+  
+  // Replace any placeholders with values
+  Object.entries(replacements).forEach(([key, value]) => {
+    message = message.replace(`{${key}}`, value);
+  });
+  
   const searchParams = new URLSearchParams();
   searchParams.append('message', message);
   if (isError) searchParams.append('status', 'error');
+  
+  // Preserve language parameter
+  searchParams.append('lang', language);
   
   // /browse/ で始まる URL に現在のパスをエンコードして付加
   return c.redirect(`/browse/${encodeURIComponent(path)}?${searchParams.toString()}`);
@@ -23,7 +39,7 @@ export const createDirectoryHandler = (targetDirectory: string) => {
       const directoryName = formData.get("name") as string || "";
       
       if (!directoryName) {
-        return redirectWithMessage(c, relativePath, "Directory name is required", true);
+        return redirectWithMessage(c, relativePath, "directory.name.required", {}, true);
       }
       
       const { fullPath } = resolvePath(relativePath, targetDirectory);
@@ -31,11 +47,11 @@ export const createDirectoryHandler = (targetDirectory: string) => {
       
       await fs.mkdir(newDirPath, { recursive: true });
       
-      return redirectWithMessage(c, relativePath, `Directory "${directoryName}" created successfully`);
+      return redirectWithMessage(c, relativePath, "directory.created", { name: directoryName });
     } catch (error) {
       const formData = await c.req.formData();
       const relativePath = formData.get("path") as string || "";
-      return redirectWithMessage(c, relativePath, `Error: ${String(error)}`, true);
+      return redirectWithMessage(c, relativePath, "error.generic", { message: String(error) }, true);
     }
   };
 };
@@ -50,7 +66,7 @@ export const createFileHandler = (targetDirectory: string) => {
       const content = formData.get("content") as string || "";
       
       if (!fileName) {
-        return redirectWithMessage(c, relativePath, "File name is required", true);
+        return redirectWithMessage(c, relativePath, "file.name.required", {}, true);
       }
       
       const { fullPath } = resolvePath(relativePath, targetDirectory);
@@ -58,11 +74,11 @@ export const createFileHandler = (targetDirectory: string) => {
       
       await fs.writeFile(newFilePath, content);
       
-      return redirectWithMessage(c, relativePath, `File "${fileName}" created successfully`);
+      return redirectWithMessage(c, relativePath, "file.created", { name: fileName });
     } catch (error) {
       const formData = await c.req.formData();
       const relativePath = formData.get("path") as string || "";
-      return redirectWithMessage(c, relativePath, `Error: ${String(error)}`, true);
+      return redirectWithMessage(c, relativePath, "error.generic", { message: String(error) }, true);
     }
   };
 };
@@ -76,7 +92,7 @@ export const uploadFileHandler = (targetDirectory: string) => {
       const file = formData.get("file") as File;
       
       if (!file) {
-        return redirectWithMessage(c, relativePath, "No file uploaded", true);
+        return redirectWithMessage(c, relativePath, "file.upload.none", {}, true);
       }
       
       const { fullPath } = resolvePath(relativePath, targetDirectory);
@@ -88,11 +104,11 @@ export const uploadFileHandler = (targetDirectory: string) => {
       
       await fs.writeFile(filePath, buffer);
       
-      return redirectWithMessage(c, relativePath, `File "${file.name}" uploaded successfully`);
+      return redirectWithMessage(c, relativePath, "file.upload.success", { name: file.name });
     } catch (error) {
       const formData = await c.req.formData();
       const relativePath = formData.get("path") as string || "";
-      return redirectWithMessage(c, relativePath, `Error: ${String(error)}`, true);
+      return redirectWithMessage(c, relativePath, "error.generic", { message: String(error) }, true);
     }
   };
 };
@@ -106,7 +122,7 @@ export const deleteFilesHandler = (targetDirectory: string) => {
       const files = formData.getAll("files") as string[];
       
       if (!files || files.length === 0) {
-        return redirectWithMessage(c, relativePath, "No files selected for deletion", true);
+        return redirectWithMessage(c, relativePath, "file.none.selected", {}, true);
       }
       
       const deletedFiles: string[] = [];
@@ -135,23 +151,23 @@ export const deleteFilesHandler = (targetDirectory: string) => {
           
           deletedFiles.push(path.basename(filePath));
         } catch (error) {
-          errors.push(`Failed to delete ${path.basename(filePath)}: ${String(error)}`);
+          errors.push(`${path.basename(filePath)}: ${String(error)}`);
         }
       }
       
       if (errors.length > 0) {
-        return redirectWithMessage(c, relativePath, `Some files could not be deleted: ${errors.join(", ")}`, true);
+        return redirectWithMessage(c, relativePath, "file.delete.partial.failure", { errors: errors.join(", ") }, true);
       }
       
       // ファイル詳細ページからの削除の場合、親ディレクトリにリダイレクト
       // または、一覧でも選択した場所にリダイレクト
       const redirectPath = fileParentDir || relativePath;
       
-      return redirectWithMessage(c, redirectPath, `Successfully deleted ${deletedFiles.length} item(s)`);
+      return redirectWithMessage(c, redirectPath, "file.delete.success", { count: deletedFiles.length.toString() });
     } catch (error) {
       const formData = await c.req.formData();
       const relativePath = formData.get("path") as string || "";
-      return redirectWithMessage(c, relativePath, `Error: ${String(error)}`, true);
+      return redirectWithMessage(c, relativePath, "error.generic", { message: String(error) }, true);
     }
   };
 };
@@ -166,7 +182,7 @@ export const editFileHandler = (targetDirectory: string) => {
       const content = formData.get("content") as string || "";
       
       if (!filePath) {
-        return redirectWithMessage(c, path.dirname(filePath), "File path is required", true);
+        return redirectWithMessage(c, path.dirname(filePath), "file.path.required", {}, true);
       }
       
       // Use resolvePath to correctly map the relative path from the form to absolute path
@@ -178,12 +194,12 @@ export const editFileHandler = (targetDirectory: string) => {
       // Get the directory path for redirecting back
       const dirPath = path.dirname(relativePath);
       
-      return redirectWithMessage(c, dirPath, `File "${fileName}" updated successfully`);
+      return redirectWithMessage(c, dirPath, "file.updated", { name: fileName });
     } catch (error) {
       const formData = await c.req.formData();
       const filePath = formData.get("path") as string || "";
       const dirPath = path.dirname(filePath);
-      return redirectWithMessage(c, dirPath, `Error: ${String(error)}`, true);
+      return redirectWithMessage(c, dirPath, "error.generic", { message: String(error) }, true);
     }
   };
 };
@@ -194,23 +210,30 @@ export const openInExplorerHandler = (targetDirectory: string) => {
     try {
       const formData = await c.req.formData();
       const relativePath = formData.get("path") as string || "";
+      const language = getCurrentLanguage(c);
+      const t = createTranslator(language, apiMessages);
       
       const { fullPath } = resolvePath(relativePath, targetDirectory);
       
       try {
         // Open the file or directory in system explorer
         await open(fullPath);
-        return c.json({ success: true, message: "Opened in system explorer" });
+        return c.json({ success: true, message: t("explorer.open.success") });
       } catch (error) {
+        const message = t("explorer.open.failure").replace("{error}", String(error));
         return c.json({ 
           success: false, 
-          message: `Failed to open: ${String(error)}` 
+          message: message
         }, 500);
       }
     } catch (error) {
+      const language = getCurrentLanguage(c);
+      const t = createTranslator(language, apiMessages);
+      const message = t("error.generic").replace("{message}", String(error));
+      
       return c.json({ 
         success: false, 
-        message: `Error: ${String(error)}` 
+        message: message
       }, 500);
     }
   };

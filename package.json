@@ -2,7 +2,8 @@
   "name": "local-file-storage",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.tsx"
+    "dev": "tsx watch src/index.tsx",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",
@@ -17,6 +18,7 @@
     "@types/mime-types": "^2.1.4",
     "@types/node": "^20.11.17",
     "tsx": "^4.7.1",
-    "typed-htmx": "^0.3.1"
+    "typed-htmx": "^0.3.1",
+    "typescript": "^5.8.3"
   }
 }
