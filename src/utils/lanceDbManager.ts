@@ -12,11 +12,15 @@ export interface FileReferenceData {
   content: string;   // File content in base64
   created_at: string;
   updated_at: string;
+  metadata: Record<string, any>; // Optional metadata as a JSON object
   [key: string]: unknown; // Add index signature to satisfy Record<string, unknown>
 }
 
 // Type for actual database operations with LanceDB
 type LanceDbRecord = Record<string, unknown>;
+
+// Search type options
+export type SearchType = 'full-text-search' | 'vector';
 
 export class LanceDbManager {
   private dbPath: string;
@@ -26,25 +30,42 @@ export class LanceDbManager {
   constructor(targetDirectory: string) {
     // Create the database in .local/lancedb directory
     this.dbPath = path.join(targetDirectory, '.local', "file-system", 'lancedb');
-    
+
     // Ensure the directory exists
     if (!fs.existsSync(this.dbPath)) {
       fs.mkdirSync(this.dbPath, { recursive: true });
     }
   }
 
+  async waitForIndex(table: lancedb.Table, indexName: string): Promise<void> {
+    const POLL_INTERVAL = 10000; // 10 seconds
+    while (true) {
+      const indices = await table.listIndices();
+      if (indices.some((index) => index.name === indexName)) {
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+    }
+  }
+
+
   // Initialize the database connection and table
   async initialize(): Promise<void> {
     try {
       // Connect to the LanceDB database
       this.db = await lancedb.connect(this.dbPath);
-      
+
       // Check if table exists
       const tableNames = await this.db.tableNames();
-      
+
       if (tableNames.includes('file_references')) {
         // Open existing table
-        this.table = await this.db.openTable('file_references');
+        const table = await this.db.openTable('file_references');
+        await table.createIndex("content", {
+          config: lancedb.Index.fts()
+        });
+        this.waitForIndex(table, "content_idx");
+        this.table = table;
       } else {
         // Create new table with schema
         const now = new Date().toISOString();
@@ -52,24 +73,138 @@ export class LanceDbManager {
           path: "__dummy__",
           hash: "0",
           content: "",
+          metadata: {},
           created_at: now,
           updated_at: now
         };
-        
-        this.table = await this.db.createTable('file_references', [initialRecord], {
+
+        const table = await this.db.createTable('file_references', [initialRecord], {
           mode: 'create'
         });
-        await this.table.createIndex("content", {
-            config: lancedb.Index.fts()
+        await table.createIndex("content", {
+          config: lancedb.Index.fts()
         });
-        
+        this.waitForIndex(table, "content_idx");
+
         // Remove dummy record
-        await this.table.delete('path = "__dummy__"');
+        await table.delete('path = "__dummy__"');
+        this.table = table
       }
-      
+
       return;
     } catch (error) {
       throw error;
+    }
+  }
+
+  // Get table names
+  async getTableNames(): Promise<string[]> {
+    try {
+      if (!this.db) {
+        await this.initialize();
+      }
+      return await this.db!.tableNames();
+    } catch (error) {
+      return [];
+    }
+  }
+
+  // Open a specific table
+  async openTable(tableName: string): Promise<boolean> {
+    try {
+      if (!this.db) {
+        await this.initialize();
+      }
+
+      const tableNames = await this.db!.tableNames();
+      if (tableNames.includes(tableName)) {
+        this.table = await this.db!.openTable(tableName);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Count total records that match a search query
+  async countRecords(
+    query: string = '',
+    searchType: SearchType = 'full-text-search'
+  ): Promise<number> {
+    try {
+      if (!this.table) throw new Error('Table not initialized');
+
+      if (searchType === 'full-text-search' && query) {
+        try {
+          // 全文検索のカウントを試行
+          return (await this.table.query()
+            .fullTextSearch(query, {
+              columns: ['content'],
+            })
+            .toArray()).length;
+        } catch (error) {
+          console.warn('Full-text search count failed, falling back to where clause:', error);
+
+          // フォールバック: 基本的なテキスト一致フィルター
+          return (await this.table.query()
+            .where(`content LIKE "%${query}%"`)
+            .toArray()).length;
+        }
+      }
+
+      // Default: count all records
+      return (await this.table.query().toArray()).length;
+    } catch (error) {
+      console.error('Count error:', error);
+      return 0;
+    }
+  }
+
+  // Search records with pagination
+  async searchRecords(
+    query: string,
+    searchType: SearchType = 'full-text-search',
+    limit: number = 25,
+    offset: number = 0
+  ): Promise<FileReferenceData[]> {
+    try {
+      if (!this.table) throw new Error('Table not initialized');
+
+      if (searchType === 'full-text-search' && query) {
+        try {
+          // 全文検索の試行
+          const results = await this.table.query()
+            .fullTextSearch(query, {
+              columns: ['content'],
+            })
+            .limit(limit)
+            .offset(offset)
+            .toArray();
+
+          return results as unknown as FileReferenceData[];
+        } catch (error) {
+          console.warn('Full-text search failed, falling back to where clause filter:', error);
+
+          // フォールバック: 基本的なテキスト一致フィルター
+          const results = await this.table.query()
+            .where(`content LIKE "%${query}%"`)
+            .limit(limit)
+            .offset(offset)
+            .toArray();
+
+          return results as unknown as FileReferenceData[];
+        }
+      } else if (searchType === 'vector') {
+        // Vector search - not implemented yet
+        throw new Error('Vector search not implemented yet');
+      }
+
+      // Default: return all records up to limit
+      return await this.listAllRecords(limit, offset);
+    } catch (error) {
+      console.error('Search error:', error);
+      return [];
     }
   }
 
@@ -86,20 +221,25 @@ export class LanceDbManager {
   }
 
   // Convert file content based on file type
-  static async fileToBase64(filePath: string): Promise<string> {
+  static async fileToBase64(filePath: string, fromUrl: boolean = false): Promise<string> {
     try {
+      // Check if file is a dot file and skip it (unless explicitly requested from URL)
+      const fileName = path.basename(filePath);
+      if (fileName.startsWith('.') && !fromUrl) {
+        return '';
+      }
+
       // Check file size first to avoid loading huge files
       const maxSize = 10 * 1024 * 1024; // 10MB
       const fileStats = fs.statSync(filePath);
-      
+
       if (fileStats.size > maxSize) {
         return '';
       }
-      
+
       // Use the existing determineFileType function which examines the first 1024 bytes
-      const fileName = path.basename(filePath);
       const { mimeType, isText } = await determineFileType(filePath, fileName);
-      
+
       if (isText) {
         // For text files, return the actual text content
         const textContent = fs.readFileSync(filePath, 'utf8');
@@ -122,17 +262,17 @@ export class LanceDbManager {
   async getFileReference(relativePath: string): Promise<FileReferenceData | null> {
     try {
       if (!this.table) throw new Error('Table not initialized');
-      
+
       // Query for the file by path
       const results = await this.table.query()
         .where(`path = "${relativePath}"`)
         .limit(1)
         .toArray();
-      
+
       if (results.length > 0) {
         return results[0] as unknown as FileReferenceData;
       }
-      
+
       return null;
     } catch (error) {
       return null;
@@ -140,46 +280,52 @@ export class LanceDbManager {
   }
 
   // Upsert a file to the database
-  async upsertFile(fullPath: string, relativePath: string): Promise<boolean> {
+  async upsertFile(
+    fullPath: string,
+    relativePath: string,
+    metadata: Record<string, any> = {}
+  ): Promise<boolean> {
     try {
       if (!this.table) throw new Error('Table not initialized');
-      
+
       // Calculate file hash
       const fileHash = LanceDbManager.calculateFileHash(fullPath);
       if (!fileHash) {
         return false;
       }
-      
+
       // Check if file already exists in DB
       const existingFile = await this.getFileReference(relativePath);
-      
-      // If file exists and hash is the same, skip processing
-      if (existingFile && existingFile.hash === fileHash) {
+
+      // If file exists and hash is the same, only update metadata if provided
+      if (existingFile && existingFile.hash === fileHash && Object.keys(metadata).length === 0) {
         return false;
       }
-      
+
       // Convert file to base64
       const contentBase64 = await LanceDbManager.fileToBase64(fullPath);
-      
+
       const now = new Date().toISOString();
-      
+
       // Prepare file data
       const fileData: LanceDbRecord = {
         path: relativePath,
         hash: fileHash,
         content: contentBase64,
         updated_at: now,
-        created_at: existingFile ? existingFile.created_at : now
+        created_at: existingFile ? existingFile.created_at : now,
+        // Merge existing metadata with new metadata if available
+        metadata: {}
       };
-      
+
       // First try to delete existing record if it exists
       if (existingFile) {
         await this.table.delete(`path = "${relativePath}"`);
       }
-      
+
       // Then insert the new/updated record
       await this.table.add([fileData]);
-      
+
       return true;
     } catch (error) {
       return false;
@@ -190,28 +336,32 @@ export class LanceDbManager {
   async deleteFile(relativePath: string): Promise<boolean> {
     try {
       if (!this.table) throw new Error('Table not initialized');
-      
+
       // Check if file exists before deletion
       const existingFile = await this.getFileReference(relativePath);
       if (!existingFile) {
         return false;
       }
-      
+
       // Delete the file by path
       await this.table.delete(`path = "${relativePath}"`);
-      
+
       return true;
     } catch (error) {
       return false;
     }
   }
-  
-  // List all records in the database
-  async listAllRecords(): Promise<FileReferenceData[]> {
+
+  // List all records in the database with pagination
+  async listAllRecords(limit: number = 25, offset: number = 0): Promise<FileReferenceData[]> {
     try {
       if (!this.table) throw new Error('Table not initialized');
-      
-      const allRecords = await this.table.query().toArray();
+
+      const allRecords = await this.table.query()
+        .limit(limit)
+        .offset(offset)
+        .toArray();
+
       return allRecords as unknown as FileReferenceData[];
     } catch (error) {
       return [];
