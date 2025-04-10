@@ -18,6 +18,31 @@ import {
 } from "./routes/apiRoutes.js";
 import { watchDirectory } from "./utils/fileWatcher.js";
 
+// Function to determine file type based on extension
+function getFileTypeFromExtension(extension: string): string {
+  const ext = extension.toLowerCase();
+  
+  // Common file types
+  const fileTypes: Record<string, string[]> = {
+    'image': ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.bmp', '.tiff'],
+    'document': ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.rtf', '.odt'],
+    'code': ['.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.scss', '.json', '.php', '.py', '.rb', '.java', '.c', '.cpp', '.go', '.rs', '.swift'],
+    'video': ['.mp4', '.mov', '.avi', '.wmv', '.flv', '.webm', '.mkv'],
+    'audio': ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a'],
+    'archive': ['.zip', '.rar', '.tar', '.gz', '.7z', '.bz2']
+  };
+  
+  // Find the file type that matches this extension
+  for (const [type, extensions] of Object.entries(fileTypes)) {
+    if (extensions.includes(ext)) {
+      return type;
+    }
+  }
+  
+  // Default if not found
+  return 'other';
+}
+
 // Get target directory from command line arguments
 const callingDirectory = process.argv[2] || process.cwd();
 const userRelativePath = process.argv[3] || ".";
@@ -80,6 +105,27 @@ const watcher = watchDirectory(targetDirectory, {
   },
   onReady: () => {
     console.log('[File Watcher] Initial scan complete and ready for tracking changes');
+  },
+  // メタデータ生成関数を追加
+  getFileMetadata: async (fullPath, relativePath) => {
+    const fs = await import('fs/promises');
+    try {
+      // ファイルの統計情報を取得
+      const stats = await fs.stat(fullPath);
+      
+      // 基本的なメタデータを生成
+      return {
+        size: stats.size,
+        lastModified: stats.mtime.toISOString(),
+        extension: path.extname(fullPath),
+        isDirectory: stats.isDirectory(),
+        // 拡張子に基づいてファイルタイプを判定
+        fileType: getFileTypeFromExtension(path.extname(fullPath))
+      };
+    } catch (error) {
+      console.error(`Error generating metadata for ${relativePath}:`, error);
+      return {};
+    }
   }
 });
 

@@ -43,12 +43,12 @@ export function parseUrlPath(urlPath: string): string {
 }
 
 // List files in a directory
-export async function listDirectory(dirPath: string) {
+export async function listDirectory(dirPath: string, isExplicitRequest: boolean = false) {
   try {
     const files = await fs.readdir(dirPath, { withFileTypes: true });
-    // Filter out files and directories that start with a dot
+    // Filter out files and directories that start with a dot unless explicitly requested
     return files
-      .filter(file => !isDotFile(file.name))
+      .filter(file => isExplicitRequest || !isDotFile(file.name))
       .map(file => ({
         name: file.name,
         isDirectory: file.isDirectory(),
@@ -61,9 +61,9 @@ export async function listDirectory(dirPath: string) {
 }
 
 // Read first N bytes of a file to determine its type
-export async function readFirstNBytes(filePath: string, bytesToRead: number = 1024): Promise<Buffer> {
-  // Skip dot files
-  if (containsDotFileOrFolder(filePath)) {
+export async function readFirstNBytes(filePath: string, bytesToRead: number = 1024, isExplicitRequest: boolean = false): Promise<Buffer> {
+  // Skip dot files unless explicitly requested
+  if (containsDotFileOrFolder(filePath) && !isExplicitRequest) {
     return Buffer.alloc(0);
   }
   
@@ -78,9 +78,9 @@ export async function readFirstNBytes(filePath: string, bytesToRead: number = 10
 }
 
 // Determine file type using first N bytes
-export async function determineFileType(filePath: string, fileName: string): Promise<{ mimeType: string, isText: boolean }> {
-  // Skip dot files
-  if (containsDotFileOrFolder(filePath) || isDotFile(fileName)) {
+export async function determineFileType(filePath: string, fileName: string, isExplicitRequest: boolean = false): Promise<{ mimeType: string, isText: boolean }> {
+  // Skip dot files unless explicitly requested
+  if ((containsDotFileOrFolder(filePath) || isDotFile(fileName)) && !isExplicitRequest) {
     return { mimeType: "application/octet-stream", isText: false };
   }
   
@@ -98,7 +98,7 @@ export async function determineFileType(filePath: string, fileName: string): Pro
     }
     
     // Determine if it's text
-    const isTextContent = isTextFile(mimeType, fileName, sampleBuffer);
+    const isTextContent = isTextFile(mimeType, fileName, sampleBuffer, isExplicitRequest);
     
     return { mimeType, isText: isTextContent };
   } catch (error) {
@@ -108,9 +108,9 @@ export async function determineFileType(filePath: string, fileName: string): Pro
 }
 
 // Determine if a file is a text file based on MIME type, name and content inspection
-export function isTextFile(mimeType: string, fileName: string, sampleBuffer?: Buffer): boolean {
-  // Skip dot files
-  if (isDotFile(fileName)) {
+export function isTextFile(mimeType: string, fileName: string, sampleBuffer?: Buffer, isExplicitRequest: boolean = false): boolean {
+  // Skip dot files unless explicitly requested
+  if (isDotFile(fileName) && !isExplicitRequest) {
     return false;
   }
   
@@ -184,7 +184,7 @@ export function isPdfFile(mimeType: string): boolean {
 }
 
 // Resolve path and verify it's within the target directory
-export function resolvePath(requestPath: string, targetDirectory: string): { fullPath: string; relativePath: string } {
+export function resolvePath(requestPath: string, targetDirectory: string, isExplicitRequest: boolean = false): { fullPath: string; relativePath: string } {
   // Parse URL path to get the actual directory path
   const relativeDirPath = parseUrlPath(requestPath);
   
@@ -206,8 +206,8 @@ export function resolvePath(requestPath: string, targetDirectory: string): { ful
     return { fullPath: targetDirectory, relativePath: '.' };
   }
   
-  // If the path contains any dot files or folders, redirect to the parent directory
-  if (containsDotFileOrFolder(relativePath)) {
+  // If the path contains any dot files or folders and it's not explicitly requested, redirect to the parent directory
+  if (containsDotFileOrFolder(relativePath) && !isExplicitRequest) {
     const parentPath = path.dirname(fullPath);
     const parentRelativePath = path.relative(targetDirectory, parentPath) || '.';
     

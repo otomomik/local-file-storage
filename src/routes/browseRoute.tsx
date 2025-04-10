@@ -20,7 +20,12 @@ export const browseHandler = (targetDirectory: string) => {
     try {
       // Get the path from the URL
       const urlPath = c.req.path.replace(/^\/browse/, "") || "/";
-      const { fullPath, relativePath } = resolvePath(urlPath, targetDirectory);
+      
+      // Check if this is an explicit request for a dot file/directory
+      const isExplicitRequest = urlPath.includes('/.') || urlPath.endsWith('/.') || 
+                               urlPath.split('/').some(part => part && part.startsWith('.'));
+                               
+      const { fullPath, relativePath } = resolvePath(urlPath, targetDirectory, isExplicitRequest);
 
       // Check if path exists
       try {
@@ -29,7 +34,7 @@ export const browseHandler = (targetDirectory: string) => {
         // If it's a file, show file preview
         if (!stat.isDirectory()) {
           const fileName = path.basename(fullPath);
-          const { mimeType, isText } = await determineFileType(fullPath, fileName);
+          const { mimeType, isText } = await determineFileType(fullPath, fileName, isExplicitRequest);
           
           const breadcrumbs = buildBreadcrumbs(path.dirname(relativePath));
           
@@ -92,7 +97,7 @@ export const browseHandler = (targetDirectory: string) => {
       }
       
       // List directory contents
-      const files = await listDirectory(fullPath);
+      const files = await listDirectory(fullPath, isExplicitRequest);
       const breadcrumbs = buildBreadcrumbs(relativePath);
       
       // 操作結果メッセージを表示するためのパラメータを取得
@@ -175,6 +180,7 @@ export const browseHandler = (targetDirectory: string) => {
           <FileList 
             files={files} 
             relativePath={relativePath} 
+            showDotFiles={isExplicitRequest}
           />
           
           {/* Include the dialogs for file operations */}
@@ -232,8 +238,8 @@ export const browseHandler = (targetDirectory: string) => {
                     
                     // Add to visual list
                     html += '<li>';
-                    html += '<div class="flex items-center justify-between">';
-                    html += '<span class="text-sm">' + filename + '</span>';
+                    html += '<div className="flex items-center justify-between">';
+                    html += '<span className="text-sm">' + filename + '</span>';
                     html += '</div>';
                     html += '</li>';
                     

@@ -9,11 +9,14 @@ export type FileItem = {
 type FileListProps = {
   files: FileItem[];
   relativePath: string;
+  showDotFiles?: boolean;
 };
 
-export const FileList: FC<FileListProps> = ({ files, relativePath }) => {
-  // .で始まるファイルやディレクトリを除外
-  const filteredFiles = files.filter(file => !file.name.startsWith('.'));
+export const FileList: FC<FileListProps> = ({ files, relativePath, showDotFiles = false }) => {
+  // Only filter out dot files if showDotFiles is false
+  const filteredFiles = showDotFiles 
+    ? files 
+    : files.filter(file => !file.name.startsWith('.'));
 
   // Format the URL path for linking
   const getFileUrl = (file: FileItem) => {

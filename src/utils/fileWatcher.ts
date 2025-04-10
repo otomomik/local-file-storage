@@ -23,6 +23,7 @@ export function watchDirectory(
     onReady?: () => void;
     processChangedFiles?: boolean; // 変更ファイル処理有効フラグ
     skipInitialProcessing?: boolean; // 初回起動時の処理をスキップするフラグ
+    getFileMetadata?: (fullPath: string, relativePath: string) => Promise<Record<string, any>>; // メタデータ取得関数
   } = {}
 ) {
   // .local ディレクトリがなければ作成
@@ -91,7 +92,8 @@ export function watchDirectory(
     
     try {
       // LanceDBに登録
-      await lanceDbManager.upsertFile(fullPath, relativePath);
+      const metadata = options.getFileMetadata ? await options.getFileMetadata(fullPath, relativePath) : {};
+      await lanceDbManager.upsertFile(fullPath, relativePath, metadata);
     } catch (error) {
       // Error in file processing
     }

@@ -37,6 +37,20 @@ export const DataTable: FC<DataTableProps> = ({
     return content;
   };
 
+  // メタデータを整形
+  const formatMetadata = (metadata: Record<string, any> | undefined): string => {
+    if (!metadata || Object.keys(metadata).length === 0) {
+      return '{}';
+    }
+    
+    try {
+      return JSON.stringify(metadata, null, 2).substring(0, 100) + 
+        (JSON.stringify(metadata).length > 100 ? '...' : '');
+    } catch (error) {
+      return '{}';
+    }
+  };
+
   // 日付を整形
   const formatDate = (dateString: string): string => {
     try {
@@ -57,6 +71,9 @@ export const DataTable: FC<DataTableProps> = ({
             </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               コンテンツプレビュー
+            </th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              メタデータ
             </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               作成日時
@@ -82,6 +99,11 @@ export const DataTable: FC<DataTableProps> = ({
                   {formatContent(record.content as string)}
                 </div>
               </td>
+              <td className="px-6 py-4 text-sm text-gray-500">
+                <div className="font-mono bg-gray-50 p-1 rounded max-w-md overflow-hidden text-ellipsis">
+                  {formatMetadata(record.metadata as Record<string, any> | undefined)}
+                </div>
+              </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {formatDate(record.created_at)}
               </td>
@@ -93,7 +115,7 @@ export const DataTable: FC<DataTableProps> = ({
           
           {sortedRecords.length === 0 && (
             <tr>
-              <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
+              <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
                 データがありません
               </td>
             </tr>
