@@ -11,7 +11,8 @@ import { rawFileHandler } from "./routes/rawFileRoute.js";
 import { 
   createDirectoryHandler, 
   createFileHandler, 
-  deleteFilesHandler 
+  deleteFilesHandler,
+  openInExplorerHandler 
 } from "./routes/apiRoutes.js";
 
 // Get target directory from command line arguments
@@ -38,6 +39,7 @@ app.get("/browse/*", browseHandler(targetDirectory));
 app.post("/api/create-directory", createDirectoryHandler(targetDirectory));
 app.post("/api/create-file", createFileHandler(targetDirectory));
 app.post("/api/delete-files", deleteFilesHandler(targetDirectory));
+app.post("/api/open-in-explorer", openInExplorerHandler(targetDirectory));
 
 // Start server
 serve(

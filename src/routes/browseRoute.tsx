@@ -116,6 +116,18 @@ export const browseHandler = (targetDirectory: string) => {
             
             <div className="flex space-x-2">
               <button
+                id="open-in-explorer-btn"
+                className="px-3 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition flex items-center"
+                onclick={`openInExplorer('${relativePath}')`}
+                title="Open current directory in system explorer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                Open in Explorer
+              </button>
+              
+              <button
                 id="delete-selected-btn"
                 className="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition flex items-center opacity-50 cursor-not-allowed"
                 disabled
@@ -248,6 +260,25 @@ export const browseHandler = (targetDirectory: string) => {
                 window.location.reload();
               }, 300);
             });
+            
+            // Function to open in explorer
+            function openInExplorer(path) {
+              const formData = new FormData();
+              formData.append('path', path);
+              
+              fetch('/api/open-in-explorer', {
+                method: 'POST',
+                body: formData
+              }).then(response => {
+                return response.json();
+              }).then(data => {
+                if (!data.success) {
+                  console.error('Failed to open file:', data.message);
+                }
+              }).catch(error => {
+                console.error('Error:', error);
+              });
+            }
           `}} />
         </MainLayout>
       );

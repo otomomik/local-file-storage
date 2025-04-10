@@ -2,6 +2,7 @@ import { type Context } from "hono";
 import fs from "fs/promises";
 import path from "path";
 import { resolvePath } from "../utils/fileUtils.js";
+import open from "open";
 
 // ユーザーが現在いるディレクトリへのリダイレクト用関数
 const redirectWithMessage = (c: Context, path: string, message: string, isError = false) => {
@@ -183,6 +184,34 @@ export const editFileHandler = (targetDirectory: string) => {
       const filePath = formData.get("path") as string || "";
       const dirPath = path.dirname(filePath);
       return redirectWithMessage(c, dirPath, `Error: ${String(error)}`, true);
+    }
+  };
+};
+
+// Handler for opening files or directories in system explorer
+export const openInExplorerHandler = (targetDirectory: string) => {
+  return async (c: Context) => {
+    try {
+      const formData = await c.req.formData();
+      const relativePath = formData.get("path") as string || "";
+      
+      const { fullPath } = resolvePath(relativePath, targetDirectory);
+      
+      try {
+        // Open the file or directory in system explorer
+        await open(fullPath);
+        return c.json({ success: true, message: "Opened in system explorer" });
+      } catch (error) {
+        return c.json({ 
+          success: false, 
+          message: `Failed to open: ${String(error)}` 
+        }, 500);
+      }
+    } catch (error) {
+      return c.json({ 
+        success: false, 
+        message: `Error: ${String(error)}` 
+      }, 500);
     }
   };
 };
