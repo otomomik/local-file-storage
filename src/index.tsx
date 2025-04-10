@@ -3,11 +3,13 @@ import { Hono } from "hono";
 import { jsxRenderer } from "hono/jsx-renderer";
 import path from "path";
 import process from "process";
+import fs from "fs";
 // import open from "open";
 
 // Import route handlers
 import { browseHandler } from "./routes/browseRoute.js";
 import { rawFileHandler } from "./routes/rawFileRoute.js";
+import { viewerHandler } from "./routes/viewerRoute.js";
 import { 
   createDirectoryHandler, 
   createFileHandler, 
@@ -19,7 +21,27 @@ import { watchDirectory } from "./utils/fileWatcher.js";
 // Get target directory from command line arguments
 const callingDirectory = process.argv[2] || process.cwd();
 const userRelativePath = process.argv[3] || ".";
+
+// 絶対パスを解決し、存在確認を行う
 const targetDirectory = path.resolve(callingDirectory, userRelativePath);
+if (!fs.existsSync(targetDirectory)) {
+  console.error(`Error: Directory does not exist: ${targetDirectory}`);
+  process.exit(1);
+}
+
+// ディレクトリであることを確認
+try {
+  const stats = fs.statSync(targetDirectory);
+  if (!stats.isDirectory()) {
+    console.error(`Error: Not a directory: ${targetDirectory}`);
+    process.exit(1);
+  }
+} catch (err) {
+  console.error(`Error checking directory: ${err}`);
+  process.exit(1);
+}
+
+console.log(`Target directory set to: ${targetDirectory}`);
 
 // Initialize Hono app
 const app = new Hono();
@@ -35,6 +57,7 @@ app.get("/", (c) => {
 // Set up routes
 app.get("/raw/*", rawFileHandler(targetDirectory));
 app.get("/browse/*", browseHandler(targetDirectory));
+app.get("/viewer", viewerHandler(targetDirectory));
 
 // API routes
 app.post("/api/create-directory", createDirectoryHandler(targetDirectory));
@@ -68,11 +91,7 @@ serve(
   },
   (info) => {
     const url = `http://localhost:${info.port}/browse/`;
-    // Uncomment to auto-open browser: open(url);
     console.log(`Server is running on ${url}`);
     console.log(`Showing contents of: ${targetDirectory}`);
-    console.log(`File watching active with LanceDB tracking in .local/lancedb`);
-    console.log(`File tracking with columns: path (unique), hash, content, created_at, updated_at`);
-    console.log(`Content storage: text files as text, images as base64, other files as "null"`);
   },
 );

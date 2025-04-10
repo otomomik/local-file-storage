@@ -5,6 +5,7 @@ import { Breadcrumbs } from "../components/Breadcrumbs.js";
 import { FileList } from "../components/FileList.js";
 import { FilePreview } from "../components/FilePreview.js";
 import { FileOperationDialogs } from "../components/FileOperationDialogs.js";
+import { NavigationMenu } from "../components/NavigationMenu.js";
 import { MainLayout } from "../layouts/MainLayout.js";
 import { 
   resolvePath, 
@@ -20,7 +21,7 @@ export const browseHandler = (targetDirectory: string) => {
       // Get the path from the URL
       const urlPath = c.req.path.replace(/^\/browse/, "") || "/";
       const { fullPath, relativePath } = resolvePath(urlPath, targetDirectory);
-      
+
       // Check if path exists
       try {
         const stat = await fs.stat(fullPath);
@@ -54,6 +55,7 @@ export const browseHandler = (targetDirectory: string) => {
           // Render file preview
           return c.render(
             <MainLayout title={`Preview: ${fileName}`}>
+              <NavigationMenu currentPage="browse" />
               <h1 className="text-2xl font-bold mb-4">File Preview: {fileName}</h1>
               <Breadcrumbs items={breadcrumbs} currentName={fileName} />
               <FilePreview
@@ -74,6 +76,7 @@ export const browseHandler = (targetDirectory: string) => {
       } catch (error) {
         return c.render(
           <MainLayout title="Error">
+            <NavigationMenu currentPage="browse" />
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
               <h1 className="font-bold">Error</h1>
               <p>Path not found: {relativePath}</p>
@@ -96,10 +99,17 @@ export const browseHandler = (targetDirectory: string) => {
       const message = c.req.query('message');
       const status = c.req.query('status') || 'success';
       
+      // 現在のディレクトリのパスを表示用に整形
+      // ルートディレクトリの場合は直接targetDirectoryを使用
+      const displayPath = relativePath === '.' 
+        ? targetDirectory 
+        : path.join(targetDirectory, relativePath);
+      
       return c.render(
         <MainLayout title="Local File System">
+          <NavigationMenu currentPage="browse" />
           <h1 className="text-2xl font-bold mb-4">Local File System</h1>
-          <p className="text-gray-600 mb-4">Browsing: {fullPath}</p>
+          <p className="text-gray-600 mb-4">Browsing: {displayPath}</p>
           
           {/* 操作結果メッセージがある場合は表示 */}
           {message && (
@@ -285,6 +295,7 @@ export const browseHandler = (targetDirectory: string) => {
     } catch (error) {
       return c.render(
         <MainLayout title="Error">
+          <NavigationMenu currentPage="browse" />
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             <h1 className="font-bold">Error</h1>
             <p>Failed to access path: {String(error)}</p>

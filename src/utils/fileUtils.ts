@@ -197,12 +197,25 @@ export function resolvePath(requestPath: string, targetDirectory: string): { ful
   }
   
   // Calculate relative path from the target directory
-  const relativePath = path.relative(targetDirectory, fullPath) || '.';
+  let relativePath = path.relative(targetDirectory, fullPath) || '.';
+  
+  // Check if relativePath contains `..` (reference to parent directory)
+  // If so, reset to root directory for security
+  if (relativePath === '..' || relativePath.startsWith('../') || relativePath.includes('/..')) {
+    console.log(`Security: Blocked access to parent directory: ${relativePath}`);
+    return { fullPath: targetDirectory, relativePath: '.' };
+  }
   
   // If the path contains any dot files or folders, redirect to the parent directory
   if (containsDotFileOrFolder(relativePath)) {
     const parentPath = path.dirname(fullPath);
     const parentRelativePath = path.relative(targetDirectory, parentPath) || '.';
+    
+    // Double check parent path doesn't contain ..
+    if (parentRelativePath === '..' || parentRelativePath.startsWith('../')) {
+      return { fullPath: targetDirectory, relativePath: '.' };
+    }
+    
     return { fullPath: parentPath, relativePath: parentRelativePath };
   }
   
