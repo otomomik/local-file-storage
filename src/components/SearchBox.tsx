@@ -6,32 +6,33 @@ type SearchBoxProps = {
   tableName?: string;
 };
 
-export const SearchBox: FC<SearchBoxProps> = ({ 
-  searchQuery = "", 
+export const SearchBox: FC<SearchBoxProps> = ({
+  searchQuery = "",
   searchType = "full-text-search",
   tableName = "file_references"
 }) => {
   return (
     <div className="mb-6 p-4 bg-white rounded-lg shadow">
-      <form method="get">
+      {/* formタグにはデフォルトでEnterキーによる送信機能があるため、そのまま活用 */}
+      <form method="get" action="/viewer">
         <input type="hidden" name="table" value={tableName} />
-        
+
         <div className="flex flex-col space-y-4">
           <div className="grid grid-cols-12 gap-4">
             <div className="col-span-12 md:col-span-8">
               <label htmlFor="search-query" className="block text-sm font-medium text-gray-700 mb-1">
                 検索クエリ
               </label>
-              <input 
+              <input
                 type="text"
                 id="search-query"
                 name="q"
                 value={searchQuery}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="検索したいテキストを入力"
+                placeholder={"検索したいテキストを入力" + (searchType === "like-search" ? "（カンマ区切りで複数指定可能）" : "")}
               />
             </div>
-            
+
             <div className="col-span-12 md:col-span-4">
               <label htmlFor="search-type" className="block text-sm font-medium text-gray-700 mb-1">
                 検索タイプ
@@ -42,12 +43,14 @@ export const SearchBox: FC<SearchBoxProps> = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={searchType}
               >
-                <option value="full-text-search">全文検索</option>
+                <option value="full-text-search"
+                  selected={searchType === "full-text-search"}>全文検索</option>
+                <option value="like-search" selected={searchType === "like-search"}>LIKE検索（カンマ区切り）</option>
                 <option value="vector" disabled>ベクトル検索 (未実装)</option>
               </select>
             </div>
           </div>
-          
+
           <div className="flex justify-end">
             <button
               type="submit"

@@ -17,7 +17,8 @@ export const viewerHandler = (targetDirectory: string) => {
       
       // Get pagination parameters
       const page = parseInt(c.req.query('page') || '1', 10);
-      const perPage = parseInt(c.req.query('per_page') || '25', 10);
+      // 表示件数を50に固定
+      const perPage = 50;
       
       // Get table name from query params (default to file_references)
       const tableName = c.req.query('table') || 'file_references';
@@ -47,7 +48,8 @@ export const viewerHandler = (targetDirectory: string) => {
       
       // Get search parameters
       const searchQuery = c.req.query('q') || '';
-      const searchType = (c.req.query('type') || 'text') as SearchType;
+      // 修正：デフォルト値を'full-text-search'に変更し、正確に型をキャストする
+      const searchType = (c.req.query('type') || 'full-text-search') as SearchType;
       
       // ソートフィールドとソート方向を取得（デフォルトはpath, asc）
       const sortField = c.req.query('sort') || 'path';
@@ -178,22 +180,8 @@ export const viewerHandler = (targetDirectory: string) => {
             tableName={tableName} 
           />
           
-          {/* Results per page selector */}
-          <div className="flex flex-wrap justify-between items-center mb-4">
-            <div className="mb-2 sm:mb-0">
-              <span className="text-gray-700 mr-2">表示件数:</span>
-              <select
-                className="px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={perPage}
-                onchange={`window.location.href='${buildUrl({ per_page: "' + this.value + '", page: 1 })}`}
-              >
-                <option value="10">10</option>
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
-            </div>
-            
+          {/* 総レコード数と表示範囲のみ表示 */}
+          <div className="flex justify-end items-center mb-4">
             <div className="text-gray-600">
               <span>{offset + 1} - {Math.min(offset + perPage, totalRecords)} / {totalRecords}件</span>
             </div>

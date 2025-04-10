@@ -20,7 +20,7 @@ export interface FileReferenceData {
 type LanceDbRecord = Record<string, unknown>;
 
 // Search type options
-export type SearchType = 'full-text-search' | 'vector';
+export type SearchType = 'full-text-search' | 'vector' | 'like-search';
 
 export class LanceDbManager {
   private dbPath: string;
@@ -127,6 +127,20 @@ export class LanceDbManager {
     }
   }
 
+  // Process query to handle comma-separated search terms
+  private processSearchQuery(query: string): string[] {
+    if (!query) return [];
+    // Split by comma and trim each term
+    return query.split(',').map(term => term.trim()).filter(term => term.length > 0);
+  }
+
+  // Build a LIKE query condition from multiple terms with OR operator
+  private buildLikeCondition(terms: string[]): string {
+    if (terms.length === 0) return '';
+
+    return terms.map(term => `content LIKE "%${term}%"`).join(' OR ');
+  }
+
   // Count total records that match a search query
   async countRecords(
     query: string = '',
@@ -135,7 +149,20 @@ export class LanceDbManager {
     try {
       if (!this.table) throw new Error('Table not initialized');
 
-      if (searchType === 'full-text-search' && query) {
+      // デバッグログ
+      console.log(`countRecords - searchType:`, searchType, `query:`, query);
+
+      if (searchType === 'like-search' && query) {
+        // 複数の検索語でLIKE検索を行う
+        const searchTerms = this.processSearchQuery(query);
+        if (searchTerms.length > 0) {
+          const whereCondition = this.buildLikeCondition(searchTerms);
+          console.log(`LIKE検索条件: ${whereCondition}`);
+          return (await this.table.query()
+            .where(whereCondition)
+            .toArray()).length;
+        }
+      } else if (searchType === 'full-text-search' && query) {
         try {
           // 全文検索のカウントを試行
           return (await this.table.query()
@@ -171,7 +198,28 @@ export class LanceDbManager {
     try {
       if (!this.table) throw new Error('Table not initialized');
 
-      if (searchType === 'full-text-search' && query) {
+      // デバッグログ
+      console.log(`searchRecords - searchType:`, searchType, `query:`, query);
+
+      if (searchType === 'like-search' && query) {
+        // LIKE検索でカンマ区切りの検索語を処理
+        const searchTerms = this.processSearchQuery(query);
+        console.log('LIKE検索用語:', searchTerms);
+        
+        if (searchTerms.length > 0) {
+          const whereCondition = this.buildLikeCondition(searchTerms);
+          console.log(`LIKE検索条件: ${whereCondition}`);
+          
+          const results = await this.table.query()
+            .where(whereCondition)
+            .limit(limit)
+            .offset(offset)
+            .toArray();
+          
+          console.log(`検索結果件数: ${results.length}`);
+          return results as unknown as FileReferenceData[];
+        }
+      } else if (searchType === 'full-text-search' && query) {
         try {
           // 全文検索の試行
           const results = await this.table.query()
@@ -181,18 +229,21 @@ export class LanceDbManager {
             .limit(limit)
             .offset(offset)
             .toArray();
-
+          
+          console.log(`全文検索結果件数: ${results.length}`);
           return results as unknown as FileReferenceData[];
         } catch (error) {
+          // エラーハンドリングを追加 - エラー時のフォールバック
           console.warn('Full-text search failed, falling back to where clause filter:', error);
-
+          
           // フォールバック: 基本的なテキスト一致フィルター
           const results = await this.table.query()
             .where(`content LIKE "%${query}%"`)
             .limit(limit)
             .offset(offset)
             .toArray();
-
+          
+          console.log(`フォールバック検索結果件数: ${results.length}`);
           return results as unknown as FileReferenceData[];
         }
       } else if (searchType === 'vector') {
