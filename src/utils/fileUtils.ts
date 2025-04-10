@@ -5,6 +5,16 @@ import { createReadStream } from "fs";
 import { fileTypeFromBuffer } from "file-type";
 import { lookup } from "mime-types";
 
+// Check if a file or directory name starts with a dot
+export function isDotFile(fileName: string): boolean {
+  return fileName.startsWith('.');
+}
+
+// Check if any part of a path contains a dot file or folder
+export function containsDotFileOrFolder(filePath: string): boolean {
+  return filePath.split(path.sep).some(part => part.startsWith('.'));
+}
+
 // Format URL path for directories
 export function formatUrlPath(relativePath: string): string {
   if (relativePath === '.' || relativePath === '') {
@@ -36,11 +46,14 @@ export function parseUrlPath(urlPath: string): string {
 export async function listDirectory(dirPath: string) {
   try {
     const files = await fs.readdir(dirPath, { withFileTypes: true });
-    return files.map(file => ({
-      name: file.name,
-      isDirectory: file.isDirectory(),
-      path: path.join(dirPath, file.name)
-    }));
+    // Filter out files and directories that start with a dot
+    return files
+      .filter(file => !isDotFile(file.name))
+      .map(file => ({
+        name: file.name,
+        isDirectory: file.isDirectory(),
+        path: path.join(dirPath, file.name)
+      }));
   } catch (error) {
     console.error(`Error listing directory ${dirPath}:`, error);
     return [];
@@ -49,6 +62,11 @@ export async function listDirectory(dirPath: string) {
 
 // Read first N bytes of a file to determine its type
 export async function readFirstNBytes(filePath: string, bytesToRead: number = 1024): Promise<Buffer> {
+  // Skip dot files
+  if (containsDotFileOrFolder(filePath)) {
+    return Buffer.alloc(0);
+  }
+  
   const fileHandle = await fsOpen(filePath, 'r');
   try {
     const buffer = Buffer.alloc(bytesToRead);
@@ -61,6 +79,11 @@ export async function readFirstNBytes(filePath: string, bytesToRead: number = 10
 
 // Determine file type using first N bytes
 export async function determineFileType(filePath: string, fileName: string): Promise<{ mimeType: string, isText: boolean }> {
+  // Skip dot files
+  if (containsDotFileOrFolder(filePath) || isDotFile(fileName)) {
+    return { mimeType: "application/octet-stream", isText: false };
+  }
+  
   try {
     // Read only first 1024 bytes for type detection
     const sampleBuffer = await readFirstNBytes(filePath, 1024);
@@ -86,6 +109,11 @@ export async function determineFileType(filePath: string, fileName: string): Pro
 
 // Determine if a file is a text file based on MIME type, name and content inspection
 export function isTextFile(mimeType: string, fileName: string, sampleBuffer?: Buffer): boolean {
+  // Skip dot files
+  if (isDotFile(fileName)) {
+    return false;
+  }
+  
   // Common text MIME types
   const textMimeTypes = [
     'text/',
@@ -170,6 +198,13 @@ export function resolvePath(requestPath: string, targetDirectory: string): { ful
   
   // Calculate relative path from the target directory
   const relativePath = path.relative(targetDirectory, fullPath) || '.';
+  
+  // If the path contains any dot files or folders, redirect to the parent directory
+  if (containsDotFileOrFolder(relativePath)) {
+    const parentPath = path.dirname(fullPath);
+    const parentRelativePath = path.relative(targetDirectory, parentPath) || '.';
+    return { fullPath: parentPath, relativePath: parentRelativePath };
+  }
   
   return { fullPath, relativePath };
 }

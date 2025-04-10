@@ -8,6 +8,11 @@ function getRelativePath(fullPath: string, targetDirectory: string): string {
   return path.relative(targetDirectory, fullPath);
 }
 
+// ドットファイルやドットディレクトリを含むパスかどうかをチェックする
+function containsDotFileOrFolder(filePath: string): boolean {
+  return filePath.split(path.sep).some(part => part.startsWith('.'));
+}
+
 // 監視の設定と開始
 export function watchDirectory(
   targetDirectory: string, 
@@ -46,6 +51,8 @@ export function watchDirectory(
       // 初期化完了後、キューに溜まった処理を実行
       if (pendingFileProcessingQueue.length > 0) {
         for (const {fullPath, relativePath} of pendingFileProcessingQueue) {
+          // ドットファイルをスキップ
+          if (containsDotFileOrFolder(relativePath)) continue;
           await processFileWithLanceDb(fullPath, relativePath);
         }
         pendingFileProcessingQueue.length = 0; // キューをクリア
@@ -79,6 +86,9 @@ export function watchDirectory(
 
   // LanceDB処理を含むファイル処理関数
   async function processFileWithLanceDb(fullPath: string, relativePath: string): Promise<void> {
+    // ドットファイルはスキップ
+    if (containsDotFileOrFolder(relativePath)) return;
+    
     try {
       // LanceDBに登録
       await lanceDbManager.upsertFile(fullPath, relativePath);
@@ -90,6 +100,9 @@ export function watchDirectory(
   // ファイル処理関数 - LanceDB へのデータ登録
   async function handleFileProcessing(fullPath: string, relativePath: string): Promise<void> {
     if (!options.processChangedFiles) return;
+    
+    // ドットファイルはスキップ
+    if (containsDotFileOrFolder(relativePath)) return;
     
     // データベース初期化が完了していない場合はキューに入れる
     if (!isDbInitialized) {
@@ -116,13 +129,13 @@ export function watchDirectory(
 
   // ファイル追加イベント（初回スキャンも含む）
   watcher.on('add', (fullPath, stats) => {
-    // .ファイルを無視（追加の安全策）
-    if (path.basename(fullPath).startsWith('.')) {
-      return;
-    }
-    
     try {
       const relativePath = getRelativePath(fullPath, targetDirectory);
+      
+      // ドットファイルを徹底的に無視
+      if (containsDotFileOrFolder(relativePath)) {
+        return;
+      }
       
       // ready イベント後の変更のみ処理
       if (Object.keys(watcher.getWatched()).length > 0) {
@@ -142,13 +155,14 @@ export function watchDirectory(
 
   // ファイル変更イベント
   watcher.on('change', (fullPath, stats) => {
-    // .ファイルを無視（追加の安全策）
-    if (path.basename(fullPath).startsWith('.')) {
-      return;
-    }
-    
     try {
       const relativePath = getRelativePath(fullPath, targetDirectory);
+      
+      // ドットファイルを徹底的に無視
+      if (containsDotFileOrFolder(relativePath)) {
+        return;
+      }
+      
       options.onModifiedFile?.(relativePath);
       
       // ファイル変更時に処理を実行
@@ -164,12 +178,13 @@ export function watchDirectory(
 
   // ファイル削除イベント
   watcher.on('unlink', (fullPath) => {
-    // .ファイルを無視（追加の安全策）
-    if (path.basename(fullPath).startsWith('.')) {
+    const relativePath = getRelativePath(fullPath, targetDirectory);
+    
+    // ドットファイルを徹底的に無視
+    if (containsDotFileOrFolder(relativePath)) {
       return;
     }
     
-    const relativePath = getRelativePath(fullPath, targetDirectory);
     options.onDeletedFile?.(relativePath);
     
     // 削除されたファイルを処理済みデータから削除
@@ -188,16 +203,20 @@ export function watchDirectory(
 
   // ディレクトリ追加イベント
   watcher.on('addDir', (dirPath) => {
-    // .ディレクトリを無視（ただし.localは許可）
-    if (path.basename(dirPath).startsWith('.') && path.basename(dirPath) !== '.local') {
+    const relativePath = getRelativePath(dirPath, targetDirectory);
+    
+    // ドットディレクトリを徹底的に無視
+    if (containsDotFileOrFolder(relativePath)) {
       return;
     }
   });
 
   // ディレクトリ削除イベント
   watcher.on('unlinkDir', (dirPath) => {
-    // .ディレクトリを無視（ただし.localは許可）
-    if (path.basename(dirPath).startsWith('.') && path.basename(dirPath) !== '.local') {
+    const relativePath = getRelativePath(dirPath, targetDirectory);
+    
+    // ドットディレクトリを徹底的に無視
+    if (containsDotFileOrFolder(relativePath)) {
       return;
     }
   });
